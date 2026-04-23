@@ -1,0 +1,2755 @@
+﻿<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LinguoFlow | Inglés con IA y Pedagogía</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <!-- Supabase -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase.config.js"></script>
+    <script src="supabase-adapter.js"></script>
+    <style>
+        :root {
+            --bg-main: #0B1120;
+            --bg-card: #151E2E;
+            --border-card: #2A3B52;
+            --accent-blue: #3B82F6;
+            --accent-purple: #8B5CF6;
+            --text-main: #F8FAFC;
+            --text-muted: #94A3B8;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(-45deg, #0B1120, #161224, #0f172a, #0B1120);
+            background-size: 400% 400%;
+            animation: gradientAnim 15s ease infinite;
+            color: var(--text-main);
+            margin: 0;
+            overflow-x: hidden;
+            scroll-behavior: smooth;
+            min-height: 100vh;
+        }
+        @keyframes gradientAnim { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+        
+        /* Efectos visuales de fondo */
+        body::before, body::after {
+            content: ''; position: fixed; width: 400px; height: 400px;
+            border-radius: 50%; filter: blur(120px); z-index: -1;
+            animation: floatAnim 20s infinite alternate ease-in-out; pointer-events: none;
+        }
+        body::before { background: rgba(59, 130, 246, 0.12); top: -100px; left: -100px; }
+        body::after { background: rgba(139, 92, 246, 0.12); bottom: -100px; right: -100px; animation-delay: -10s; }
+        @keyframes floatAnim { 0% { transform: translate(0, 0) scale(1); } 100% { transform: translate(80px, 80px) scale(1.1); } }
+
+        /* Mapa y Timeline */
+        .timeline-container { position: relative; max-width: 1000px; margin: 0 auto; padding: 40px 20px; }
+        .timeline-line {
+            position: absolute; left: 50%; transform: translateX(-50%); width: 4px; height: 100%;
+            background: linear-gradient(to bottom, var(--accent-blue) var(--progress-height, 0%), var(--border-card) var(--progress-height, 0%));
+            z-index: 0; border-radius: 4px; box-shadow: 0 0 15px rgba(59, 130, 246, 0.3);
+        }
+        .world-divider { width: 100%; text-align: center; margin: 80px 0 60px 0; position: relative; z-index: 2; }
+        .world-divider span {
+            background: linear-gradient(135deg, var(--bg-card), var(--bg-main));
+            padding: 12px 32px; border-radius: 30px; border: 2px solid var(--accent-purple);
+            color: white; font-weight: 800; letter-spacing: 2px; text-transform: uppercase;
+            box-shadow: 0 10px 30px -10px rgba(139, 92, 246, 0.5); display: inline-block;
+        }
+        .level-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 60px; position: relative; z-index: 1; width: 100%; }
+        .node {
+            position: absolute; left: 50%; transform: translateX(-50%);
+            width: 54px; height: 54px; border-radius: 50%; background-color: var(--bg-main);
+            border: 3px solid var(--border-card); display: flex; align-items: center; justify-content: center;
+            color: var(--text-muted); transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); z-index: 2;
+        }
+        .node.unlocked { border-color: var(--accent-blue); background-color: rgba(59, 130, 246, 0.15); color: var(--accent-blue); box-shadow: 0 0 20px rgba(59, 130, 246, 0.4); transform: translateX(-50%) scale(1.1); }
+        .node.completed { background-color: var(--accent-blue); border-color: var(--accent-blue); color: white; box-shadow: 0 0 20px rgba(59, 130, 246, 0.6); }
+        .level-card {
+            width: calc(50% - 70px); background: linear-gradient(145deg, var(--bg-card), #0f1623);
+            border: 1px solid var(--border-card); border-radius: 20px; padding: 24px; transition: all 0.4s ease;
+            position: relative; opacity: 0.5; pointer-events: none; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        .level-card.unlocked { opacity: 1; pointer-events: auto; cursor: pointer; }
+        .level-card.unlocked:hover {
+            transform: translateY(-8px) scale(1.03); border-color: rgba(59, 130, 246, 0.6);
+            box-shadow: 0 20px 40px -10px rgba(0,0,0,0.7), inset 0 0 0 1px rgba(255,255,255,0.08);
+            background: linear-gradient(145deg, #1e293b, #0f1623);
+        }
+        .level-row:nth-child(odd) .level-card { margin-right: auto; }
+        .level-row:nth-child(even) .level-card { margin-left: auto; }
+
+        @media (max-width: 768px) {
+            .timeline-line { left: 40px; }
+            .node { left: 40px; transform: translateX(-50%); }
+            .node.unlocked { transform: translateX(-50%) scale(1.1); }
+            .level-card { width: calc(100% - 90px); margin-left: 90px !important; }
+        }
+
+        /* Vista de Clase */
+        #class-view {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: var(--bg-main);
+            z-index: 100; overflow-y: auto;
+        }
+        .exercise-stage {
+            position: relative;
+            isolation: isolate;
+        }
+        .exercise-stage::before {
+            content: none;
+        }
+        .exercise-stage.exercise-active::before {
+            content: '';
+            position: absolute;
+            inset: -30px;
+            z-index: -1;
+            background:
+                radial-gradient(circle at 35% 25%, rgba(56, 189, 248, 0.08), transparent 42%),
+                radial-gradient(circle at 65% 72%, rgba(59, 130, 246, 0.07), transparent 45%);
+            animation: exerciseNebula 10s ease-in-out infinite alternate;
+            pointer-events: none;
+        }
+        #class-view.theory-mode .exercise-stage::before {
+            content: none;
+        }
+        @keyframes exerciseNebula {
+            0% { transform: translate3d(-10px, 0, 0) scale(1); opacity: 0.75; }
+            100% { transform: translate3d(10px, -12px, 0) scale(1.06); opacity: 1; }
+        }
+        .exercise-topbar {
+            background: linear-gradient(145deg, rgba(21, 30, 46, 0.94), rgba(11, 17, 32, 0.92));
+            border-color: rgba(78, 106, 148, 0.45);
+            box-shadow: 0 18px 40px -28px rgba(14, 165, 233, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+            backdrop-filter: blur(12px);
+            overflow: hidden;
+        }
+        .exercise-topbar::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -45%;
+            width: 36%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.16), transparent);
+            animation: topbarSweep 5s linear infinite;
+            pointer-events: none;
+        }
+        #class-view.theory-mode .exercise-topbar {
+            background: #151E2E;
+            border-color: #2A3B52;
+            box-shadow: 0 10px 20px -12px rgba(0, 0, 0, 0.55);
+            backdrop-filter: none;
+        }
+        #class-view.theory-mode .exercise-topbar::after {
+            display: none;
+        }
+        @keyframes topbarSweep {
+            0% { transform: translateX(0); opacity: 0; }
+            14% { opacity: 0.7; }
+            100% { transform: translateX(420%); opacity: 0; }
+        }
+        .exercise-progress-track {
+            background: rgba(3, 9, 22, 0.9);
+            border-color: rgba(66, 95, 138, 0.55);
+            box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.02);
+        }
+        #exercise-progress {
+            background: linear-gradient(90deg, #1d4ed8 0%, #2563eb 28%, #3b82f6 56%, #60a5fa 78%, #1d4ed8 100%);
+            background-size: 230% 100%;
+            box-shadow: 0 0 16px rgba(59, 130, 246, 0.45);
+            animation: progressFlow 3.1s linear infinite, progressHueShift 5.2s ease-in-out infinite;
+        }
+        #exercise-progress::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 24px;
+            right: 0;
+            background: linear-gradient(90deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.62));
+            filter: blur(0.4px);
+            animation: progressSpark 1.4s ease-in-out infinite;
+        }
+        @keyframes progressFlow {
+            0% { background-position: 0% 50%; }
+            100% { background-position: 220% 50%; }
+        }
+        @keyframes progressSpark {
+            0%, 100% { opacity: 0.25; transform: translateX(0); }
+            50% { opacity: 0.9; transform: translateX(4px); }
+        }
+        @keyframes progressHueShift {
+            0%, 100% { filter: saturate(1) brightness(1); }
+            50% { filter: saturate(1.25) brightness(1.08); }
+        }
+        .exercise-lives-shell {
+            background: rgba(6, 12, 27, 0.9);
+            border-color: rgba(86, 114, 153, 0.42);
+            box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.55), 0 10px 24px -20px rgba(239, 68, 68, 0.8);
+        }
+        #class-view.theory-mode .exercise-progress-track {
+            background: #0B1120;
+            border-color: #2A3B52;
+            box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.6);
+        }
+        #class-view.theory-mode .exercise-lives-shell {
+            background: #0B1120;
+            border-color: #2A3B52;
+            box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.55);
+        }
+
+        /* Estilos Ejercicios */
+        .exercise-card {
+            position: relative;
+            overflow: hidden;
+            background: linear-gradient(152deg, rgba(21, 30, 46, 0.98), rgba(12, 20, 36, 0.96));
+            border: 1px solid rgba(76, 103, 141, 0.52);
+            box-shadow: 0 32px 70px -45px rgba(56, 189, 248, 0.55), 0 24px 50px -40px rgba(147, 51, 234, 0.52);
+            animation: cardEnter 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+        }
+        .exercise-card::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background:
+                radial-gradient(circle at 12% 8%, rgba(96, 165, 250, 0.2), transparent 35%),
+                radial-gradient(circle at 90% 90%, rgba(217, 70, 239, 0.14), transparent 42%);
+            pointer-events: none;
+        }
+        .exercise-card > * { position: relative; z-index: 1; }
+        @keyframes cardEnter {
+            0% { opacity: 0; transform: translateY(24px) scale(0.98); filter: blur(5px); }
+            100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+        }
+        .exercise-pill {
+            border-color: rgba(96, 165, 250, 0.45);
+            background: linear-gradient(120deg, rgba(59, 130, 246, 0.2), rgba(30, 64, 175, 0.08));
+            box-shadow: inset 0 0 0 1px rgba(191, 219, 254, 0.06), 0 10px 25px -20px rgba(56, 189, 248, 0.8);
+        }
+        .exercise-question {
+            text-shadow: 0 4px 18px rgba(15, 23, 42, 0.65);
+        }
+        .exercise-audio-btn {
+            background: linear-gradient(120deg, rgba(37, 99, 235, 0.2), rgba(59, 130, 246, 0.08));
+            border-color: rgba(96, 165, 250, 0.45);
+            box-shadow: 0 12px 24px -20px rgba(59, 130, 246, 0.9);
+            transition: all 0.25s ease;
+        }
+        .exercise-audio-btn:hover {
+            transform: translateY(-2px);
+            background: linear-gradient(120deg, rgba(37, 99, 235, 0.33), rgba(59, 130, 246, 0.14));
+            box-shadow: 0 20px 30px -24px rgba(56, 189, 248, 0.9);
+        }
+        .exercise-secondary-btn {
+            transition: all 0.25s ease;
+            box-shadow: 0 12px 24px -22px rgba(15, 23, 42, 0.7);
+        }
+        .exercise-secondary-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 18px 28px -24px rgba(59, 130, 246, 0.6);
+        }
+        .exercise-option {
+            background: linear-gradient(145deg, rgba(21, 30, 46, 0.95), rgba(11, 17, 32, 0.93));
+            border: 2px solid rgba(63, 86, 118, 0.78);
+            transition: transform 0.22s ease, border-color 0.22s ease, box-shadow 0.22s ease, background-color 0.22s ease;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03), 0 16px 30px -24px rgba(15, 23, 42, 0.9);
+            will-change: transform, box-shadow;
+        }
+        .exercise-option-enter {
+            animation: optionRise 0.45s ease both;
+        }
+        @keyframes optionRise {
+            from { opacity: 0; transform: translateY(14px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .exercise-option:hover {
+            border-color: rgba(96, 165, 250, 0.45);
+            background: linear-gradient(145deg, rgba(25, 37, 56, 0.96), rgba(13, 21, 35, 0.94));
+            transform: translateY(-1px);
+            box-shadow: 0 10px 16px -16px rgba(56, 189, 248, 0.35);
+        }
+        .exercise-option.is-selected {
+            border-color: rgba(96, 165, 250, 0.95);
+            background: linear-gradient(145deg, rgba(30, 58, 138, 0.34), rgba(30, 64, 175, 0.18));
+            box-shadow: 0 25px 35px -30px rgba(56, 189, 248, 0.95);
+        }
+        .answer-dot { transition: all 0.25s ease; }
+        .exercise-option.is-selected .answer-dot {
+            border-color: rgba(96, 165, 250, 1);
+            background: rgba(96, 165, 250, 1);
+            transform: scale(1.1);
+            box-shadow: 0 0 14px rgba(56, 189, 248, 0.8);
+        }
+        .exercise-option.correct {
+            border-color: rgba(16, 185, 129, 0.85);
+            background: linear-gradient(145deg, rgba(6, 78, 59, 0.35), rgba(20, 83, 45, 0.2));
+            color: #6ee7b7;
+        }
+        .exercise-option.incorrect {
+            border-color: rgba(248, 113, 113, 0.85);
+            background: linear-gradient(145deg, rgba(127, 29, 29, 0.32), rgba(69, 10, 10, 0.2));
+            color: #fca5a5;
+        }
+        .exercise-cta {
+            background: linear-gradient(100deg, #2563eb 0%, #3b82f6 45%, #2563eb 100%);
+            background-size: 200% 100%;
+            border: 1px solid rgba(147, 197, 253, 0.35);
+            box-shadow: 0 12px 30px -20px rgba(37, 99, 235, 0.95), 0 4px 0 rgb(29, 78, 216);
+            transition: all 0.25s ease;
+            animation: ctaFlow 2.8s linear infinite;
+        }
+        .exercise-cta:hover {
+            transform: translateY(-2px);
+            filter: brightness(1.06);
+            box-shadow: 0 16px 36px -22px rgba(59, 130, 246, 0.95), 0 6px 0 rgb(29, 78, 216);
+        }
+        .exercise-cta:active {
+            transform: translateY(4px);
+            box-shadow: 0 0 0 transparent;
+        }
+        @keyframes ctaFlow {
+            0% { background-position: 0% 50%; }
+            100% { background-position: 200% 50%; }
+        }
+        
+        /* Estilos Ordenar Palabras */
+        .word-chip {
+            background: linear-gradient(145deg, rgba(30, 41, 59, 0.98), rgba(15, 23, 42, 0.95));
+            border: 2px solid rgba(63, 86, 118, 0.76);
+            padding: 12px 20px; border-radius: 16px; font-weight: 600; font-size: 1.1rem;
+            cursor: pointer; transition: all 0.22s ease; box-shadow: 0 4px 0 rgb(51, 65, 85);
+            user-select: none; color: white;
+        }
+        .word-chip:hover {
+            border-color: rgba(96, 165, 250, 0.9);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 0 rgba(59, 130, 246, 0.9), 0 16px 26px -22px rgba(59, 130, 246, 0.95);
+        }
+        .word-chip:active { transform: translateY(4px); box-shadow: 0 0 0 transparent; }
+        .word-chip.selected { opacity: 0; pointer-events: none; transform: scale(0.9); }
+        .dropzone-area {
+            min-height: 80px; border: 2px dashed rgba(74, 97, 131, 0.72); border-radius: 20px; padding: 16px;
+            display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+            background: linear-gradient(145deg, rgba(5, 10, 24, 0.72), rgba(15, 23, 42, 0.66));
+            transition: all 0.25s ease;
+        }
+        .dropzone-area.correct {
+            border-color: rgba(52, 211, 153, 0.9);
+            box-shadow: 0 0 0 1px rgba(52, 211, 153, 0.2), 0 20px 30px -24px rgba(52, 211, 153, 0.8);
+        }
+        .dropzone-area.incorrect {
+            border-color: rgba(248, 113, 113, 0.9);
+            box-shadow: 0 0 0 1px rgba(248, 113, 113, 0.24), 0 20px 30px -24px rgba(248, 113, 113, 0.8);
+        }
+
+        /* Vidas y Utils */
+        .heart-active {
+            color: #EF4444;
+            text-shadow: 0 0 12px rgba(239, 68, 68, 0.65);
+            animation: heartPulse 1.7s ease-in-out infinite;
+        }
+        .heart-lost { color: var(--border-card); }
+        .lives-badge { display: flex; align-items: center; gap: 8px; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.2); padding: 8px 16px; border-radius: 20px; font-weight: bold; }
+        @keyframes heartPulse {
+            0%, 100% { transform: scale(1); }
+            35% { transform: scale(1.1); }
+            60% { transform: scale(0.98); }
+        }
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-10px); } 75% { transform: translateX(10px); } }
+        .shake-animation { animation: shake 0.4s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-fade { animation: fadeIn 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
+        @keyframes slideUpFade { from { opacity: 0; transform: translateY(30px); filter: blur(4px); } to { opacity: 1; transform: translateY(0); filter: blur(0); } }
+        .animate-slide-up { animation: slideUpFade 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards; opacity: 0; }
+        .delay-100 { animation-delay: 100ms; }
+        .delay-200 { animation-delay: 200ms; }
+        .delay-300 { animation-delay: 300ms; }
+        @media (prefers-reduced-motion: reduce) {
+            .exercise-card,
+            .exercise-option-enter,
+            #exercise-progress,
+            .exercise-topbar::after,
+            .heart-active,
+            .exercise-cta {
+                animation: none !important;
+            }
+        }
+        
+        /* Scrollbar del mapa igual al dashboard (sin personalización global) */
+
+        /* =====================================================================
+           ESTILOS DEL SIDEBAR (Extraídos de deshboard.html)
+           ===================================================================== */
+        /* Ocultar scrollbar pero permitir scroll en el sidebar */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        /* Transición con curva elástica super premium */
+        aside.sidebar-transition {
+            transition: width 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        /* Animación de links laterales */
+        .nav-link {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+        }
+        .nav-link:hover {
+            transform: translateX(8px);
+            background-color: rgba(255,255,255,0.05);
+        }
+        .nav-link.active:hover {
+            background-color: rgba(37, 99, 235, 0.25);
+        }
+        
+        /* Indicador activo brillante (Barra izquierda) */
+        .nav-link.active::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            height: 60%;
+            width: 4px;
+            background-color: #3B82F6;
+            border-radius: 0 4px 4px 0;
+            box-shadow: 0 0 12px rgba(59, 130, 246, 0.8);
+            transition: all 0.3s ease;
+        }
+
+        /* Ajustes de centrado al colapsar el menú */
+        aside.w-20 .nav-link {
+            justify-content: center;
+            padding-left: 0;
+            padding-right: 0;
+        }
+        aside.w-20 .nav-link i {
+            margin: 0; 
+        }
+        aside.w-20 .h-20 {
+            padding-left: 0;
+            padding-right: 0;
+            justify-content: center;
+        }
+        aside.w-20 .h-20 .mr-3 {
+            margin-right: 0;
+        }
+
+        /* Tooltips Premium (Aparecen solo cuando está colapsado y haces hover) */
+        aside.w-20 .nav-link::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            left: calc(100% + 20px);
+            top: 50%;
+            transform: translateY(-50%) scale(0.9);
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(8px);
+            color: #F8FAFC;
+            padding: 8px 14px;
+            border-radius: 10px;
+            font-size: 13px;
+            font-weight: 600;
+            letter-spacing: 0.025em;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            box-shadow: 0 10px 25px -5px rgba(0,0,0,0.5), 0 0 20px -5px rgba(59,130,246,0.15);
+            z-index: 100;
+        }
+        aside.w-20 .nav-link:hover::after {
+            opacity: 1;
+            transform: translateY(-50%) scale(1);
+            left: calc(100% + 14px); /* Deslizamiento elástico */
+        }
+
+        /* Comportamiento en Móvil (Modo "Drawer" deslizante real) */
+        @media (max-width: 768px) {
+            aside.w-64 {
+                position: absolute;
+                height: 100%;
+                z-index: 40;
+                box-shadow: 20px 0 50px rgba(0,0,0,0.6);
+            }
+            /* En lugar de hacerse pequeño (w-20), se esconde deslizándose a la izquierda */
+            aside.w-20 {
+                position: absolute;
+                height: 100%;
+                z-index: 40;
+                width: 16rem; 
+                transform: translateX(-100%);
+            }
+        }
+        /* ===================================================================== */
+    </style>
+</head>
+<body class="h-screen overflow-hidden flex text-white font-sans selection:bg-blue-500/30">
+
+    <!-- OVERLAY MÓVIL (Fondo oscuro cuando el menú está abierto en el móvil) -->
+    <div id="mobile-backdrop" class="fixed inset-0 bg-[#0B1120]/80 backdrop-blur-sm z-30 hidden opacity-0 transition-opacity duration-300 md:hidden" onclick="document.getElementById('toggleSidebar').click()"></div>
+
+    <!-- SIDEBAR (Panel Vertical) - Igual que en el dashboard -->
+    <aside id="sidebar" class="sidebar-transition w-64 bg-[#0B1120]/95 backdrop-blur-xl border-r border-[#2A3B52] flex flex-col z-40 flex-shrink-0 relative shadow-[4px_0_24px_rgba(0,0,0,0.3)]">
+        <!-- Logo -->
+        <div class="h-20 flex items-center px-5 border-b border-[#2A3B52] group cursor-pointer" onclick="window.location.href='index.html'">
+            <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-700 rounded-xl flex items-center justify-center font-bold text-xl shadow-lg shadow-blue-500/30 mr-3 shrink-0 transition-transform duration-300 group-hover:rotate-12 group-hover:scale-110 text-white">L</div>
+            <span class="text-xl font-bold tracking-tight whitespace-nowrap overflow-hidden sidebar-text bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400 group-hover:to-white transition-all">LinguoFlow</span>
+        </div>
+
+        <!-- Menú de Navegación -->
+        <nav class="flex-1 overflow-y-auto no-scrollbar py-6 space-y-2">
+            <a href="index.html" class="nav-link flex items-center px-4 py-3 mx-3 rounded-xl text-gray-400 border border-transparent group" data-tooltip="Inicio">
+                <i class="ph-fill ph-house text-2xl shrink-0 group-hover:scale-110 group-hover:-translate-y-1 transition-transform"></i>
+                <span class="ml-3 font-medium whitespace-nowrap overflow-hidden sidebar-text">Inicio</span>
+            </a>
+            
+            <a href="niveles.html" class="nav-link active flex items-center px-4 py-3 mx-3 rounded-xl bg-blue-600/15 text-blue-400 border border-blue-500/20 shadow-[inset_0_0_12px_rgba(59,130,246,0.1)] group" data-tooltip="Niveles de Estudio">
+                <i class="ph-fill ph-map-trifold text-2xl shrink-0 group-hover:scale-110 group-hover:-translate-y-1 group-hover:text-purple-400 transition-all"></i>
+                <span class="ml-3 font-medium whitespace-nowrap overflow-hidden sidebar-text">Niveles</span>
+            </a>
+
+            <a href="index.html?view=vocab" class="nav-link flex items-center px-4 py-3 mx-3 rounded-xl text-gray-400 border border-transparent group" data-tooltip="Tu Glosario">
+                <i class="ph-fill ph-book-bookmark text-2xl shrink-0 group-hover:scale-110 group-hover:-translate-y-1 group-hover:text-emerald-400 transition-all"></i>
+                <span class="ml-3 font-medium whitespace-nowrap overflow-hidden sidebar-text">Glosario</span>
+            </a>
+
+            <a href="index.html?view=alphabet" class="nav-link flex items-center px-4 py-3 mx-3 rounded-xl text-gray-400 border border-transparent group" data-tooltip="Alfabeto Interactivo">
+                <i class="ph-fill ph-text-aa text-2xl shrink-0 group-hover:scale-110 group-hover:-translate-y-1 group-hover:text-indigo-300 transition-all"></i>
+                <span class="ml-3 font-medium whitespace-nowrap overflow-hidden sidebar-text">Alfabeto</span>
+            </a>
+
+            <a href="index.html?view=achievements" class="nav-link flex items-center px-4 py-3 mx-3 rounded-xl text-gray-400 border border-transparent group" data-tooltip="Logros y Medallas">
+                <i class="ph-fill ph-medal text-2xl shrink-0 group-hover:scale-110 group-hover:-translate-y-1 group-hover:text-yellow-400 transition-all"></i>
+                <span class="ml-3 font-medium whitespace-nowrap overflow-hidden sidebar-text">Logros</span>
+            </a>
+
+            <a href="index.html?view=guide" class="nav-link flex items-center px-4 py-3 mx-3 rounded-xl text-gray-400 border border-transparent group" data-tooltip="Guía de Ayuda">
+                <i class="ph-fill ph-book-open text-2xl shrink-0 group-hover:scale-110 group-hover:-translate-y-1 group-hover:text-cyan-300 transition-all"></i>
+                <span class="ml-3 font-medium whitespace-nowrap overflow-hidden sidebar-text">Guia de estudio</span>
+            </a>
+        </nav>
+
+        <!-- Configuración abajo -->
+        <div class="p-4 border-t border-[#2A3B52]" id="sidebar-user-settings">
+            <a href="index.html?view=profile" class="nav-link flex items-center px-4 py-3 rounded-xl text-gray-400 border border-transparent group" data-tooltip="Mi Perfil">
+                <i class="ph-fill ph-user-circle text-2xl shrink-0 group-hover:scale-110 group-hover:-translate-y-1 transition-transform duration-500"></i>
+                <span class="ml-3 font-medium whitespace-nowrap overflow-hidden sidebar-text">Mi perfil</span>
+            </a>
+            <button type="button" onclick="handleLogout(event)" class="nav-link flex items-center px-4 py-3 rounded-xl text-red-400 border border-red-500/30 group mt-2 hover:bg-red-500/10 hover:border-red-500/50" data-tooltip="Cerrar sesion">
+                <i class="ph-fill ph-sign-out text-2xl shrink-0 group-hover:scale-110 group-hover:-translate-y-1 transition-transform duration-500"></i>
+                <span class="ml-3 font-medium whitespace-nowrap overflow-hidden sidebar-text">Cerrar sesion</span>
+            </button>
+        </div>
+    </aside>
+
+    <!-- CONTENEDOR PRINCIPAL (Envuelta la página original para que fluya al lado del sidebar) -->
+    <div class="flex-1 flex flex-col h-screen overflow-hidden relative">
+
+        <!-- VISTA DEL MAPA -->
+        <div id="map-view" class="h-full overflow-y-auto opacity-0 translate-y-2 transition-all duration-500 ease-out">
+            <!-- HEADER DEL MAPA (Añadido botón toggleSidebar) -->
+            <header class="h-20 bg-[#151E2E]/60 backdrop-blur-xl flex items-center justify-between px-6 md:px-8 z-30 shrink-0 border-b border-[#2A3B52] shadow-sm sticky top-0">
+                <div class="w-full flex justify-between items-center map-entrance animate-slide-up delay-100">
+                    <div class="flex items-center gap-4">
+                        <!-- Botón para ocultar/mostrar menú lateral -->
+                        <button id="toggleSidebar" aria-label="Alternar menú lateral" class="text-gray-400 hover:text-white transition-all focus:outline-none bg-[#0B1120] p-2.5 rounded-xl border border-[#2A3B52] hover:border-blue-500/50 hover:shadow-[0_0_15px_rgba(59,130,246,0.2)]">
+                            <i class="ph ph-list text-xl"></i>
+                        </button>
+                        
+                        <div class="flex flex-col leading-tight">
+                            <h1 id="levels-view-title" class="text-base sm:text-xl font-bold tracking-tight text-white">Mapa de Niveles</h1>
+                            <p id="levels-view-subtitle" class="text-[11px] sm:text-xs text-blue-300/80 font-semibold">Ruta completa de clases y progreso.</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-6">
+                        <div class="lives-badge cursor-help" title="Recuperas 1 vida cada 2 minutos">
+                            <i class="ph-fill ph-heart text-red-500 text-xl"></i>
+                            <span id="header-lives-count" class="text-red-400">5</span>
+                            <span id="header-lives-timer" class="text-xs text-red-300 ml-2 hidden font-mono">02:00</span>
+                        </div>
+                        <div class="flex flex-col items-end hidden sm:flex">
+                            <span class="text-xs text-gray-400 font-semibold uppercase tracking-wider">Tu Nivel</span>
+                            <span class="font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400" id="global-progress">0%</span>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <div class="max-w-4xl mx-auto text-center py-16 px-6 map-entrance animate-slide-up delay-200">
+                <span class="text-purple-500 font-bold uppercase tracking-widest text-sm mb-3 block">El Método Definitivo</span>
+                <h2 class="text-5xl md:text-7xl font-black mb-6 bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 text-transparent bg-clip-text tracking-tight">De Cero a Fluidez</h2>
+                <p class="text-gray-400 text-lg md:text-xl max-w-2xl mx-auto leading-relaxed">
+                    110 clases diseñadas para hackear tu cerebro. Aprenderás por qué te equivocas al traducir del español y cómo construir oraciones nativas instintivamente.
+                </p>
+            </div>
+
+            <div class="timeline-container map-entrance animate-slide-up delay-300" id="timeline">
+                <div class="timeline-line" id="timeline-line"></div>
+            </div>
+        </div>
+
+        <!-- VISTA DE CLASE -->
+        <div id="class-view">
+            <div class="max-w-4xl mx-auto px-4 sm:px-6 py-6 min-h-screen flex flex-col relative">
+                
+                <!-- Navbar de la clase -->
+                <div class="exercise-topbar relative flex justify-between items-center mb-6 bg-[#151E2E] p-4 rounded-2xl border border-[#2A3B52] shadow-xl sticky top-4 z-50">
+                    <button onclick="exitClass()" class="text-gray-400 hover:text-white flex items-center gap-2 transition-colors p-2 rounded-lg hover:bg-[#2A3B52]/50">
+                        <i class="ph ph-x text-2xl"></i> <span class="font-medium hidden sm:inline">Salir</span>
+                    </button>
+                    <div class="flex-1 mx-4 sm:mx-8 relative">
+                        <div class="exercise-progress-track h-4 bg-[#0B1120] rounded-full overflow-hidden border border-[#2A3B52] shadow-inner">
+                            <!-- BARRA DE PROGRESO -->
+                            <div id="exercise-progress" class="h-full transition-all duration-500 ease-out w-0 relative">
+                                <div class="absolute top-0 right-0 bottom-0 left-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMCIgaGVpZ2h0PSIyMCI+PHBhdGggZD0iTTAgMjBMMjAgMEwyMCAyMEgwWiIgZmlsbD0icmdiYSgyNTUsMjU1LDI1NSwwLjEpIi8+PC9zdmc+')] opacity-30"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="exercise-lives-shell flex gap-1.5 bg-[#0B1120] px-4 py-2 rounded-full border border-[#2A3B52] shadow-inner" id="lives-container"></div>
+                </div>
+                
+                <!-- Contenedor Dinámico -->
+                <div id="class-content" class="exercise-stage flex-1 flex flex-col justify-center pb-20 mt-4">
+                    <!-- Inyección JS -->
+                </div>
+            </div>
+        </div>
+    
+    </div> <!-- FIN DEL CONTENEDOR PRINCIPAL FLEX -->
+
+    <!-- MODAL DE FEEDBACK (EL PROFESOR EXPLICA) -->
+    <div id="feedback-modal" class="fixed inset-0 bg-black/90 backdrop-blur-md z-[200] hidden items-center justify-center p-4">
+        <div class="bg-[#151E2E] border border-[#2A3B52] p-6 md:p-10 rounded-[2rem] max-w-2xl w-full shadow-[0_0_80px_rgba(59,130,246,0.15)] transform transition-all flex flex-col max-h-[90vh] overflow-y-auto relative">
+            <button onclick="closeFeedbackModal()" class="absolute top-6 right-6 text-gray-500 hover:text-white transition-colors bg-[#0B1120] p-2 rounded-full"><i class="ph ph-x text-xl"></i></button>
+            
+            <div class="flex items-center gap-4 mb-6">
+                <div class="w-16 h-16 bg-red-500/10 border border-red-500/20 rounded-2xl flex items-center justify-center shrink-0">
+                    <i class="ph-fill ph-warning-circle text-4xl text-red-500"></i>
+                </div>
+                <div>
+                    <h3 class="text-2xl md:text-3xl font-black text-white tracking-tight">¡Pausa! Analicemos el error</h3>
+                    <p class="text-gray-400">Cometer errores es la única forma real de aprender.</p>
+                </div>
+            </div>
+
+            <div id="feedback-content" class="text-left space-y-6">
+                <!-- Llenado por JS -->
+            </div>
+            
+            <div class="mt-8 pt-6 border-t border-[#2A3B52] text-center">
+                <p class="text-sm text-red-400 font-bold mb-4 flex items-center justify-center gap-2">
+                    <i class="ph-fill ph-heart-break"></i> Has perdido 1 vida
+                </p>
+                <button onclick="closeFeedbackModal()" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-5 rounded-2xl transition-all text-lg shadow-[0_4px_0_rgb(37,99,235)] hover:translate-y-[2px] active:shadow-none">
+                    Entendido, no volveré a fallar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODALES SISTEMA -->
+    <div id="no-lives-modal" class="fixed inset-0 bg-black/95 backdrop-blur-xl z-[300] hidden items-center justify-center p-6">
+        <div class="bg-[#151E2E] border border-red-500/30 p-10 rounded-[2rem] max-w-md w-full text-center shadow-[0_0_100px_rgba(239,68,68,0.2)]">
+            <div class="w-28 h-28 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-8 relative border-4 border-red-500/20">
+                <i class="ph-fill ph-heart-break text-7xl text-red-500 animate-pulse"></i>
+            </div>
+            <h3 class="text-4xl font-black mb-4 text-white">Sin Vidas</h3>
+            <p class="text-gray-400 mb-8 text-lg leading-relaxed">Tu cerebro necesita descansar para procesar las reglas que acabas de aprender. Tómate un respiro.</p>
+            <div class="bg-[#0B1120] border border-[#2A3B52] rounded-2xl p-6 mb-8 shadow-inner">
+                <p class="text-sm text-gray-500 uppercase font-bold tracking-widest mb-2">Próxima vida en:</p>
+                <p id="modal-timer" class="text-5xl font-mono font-black text-red-400 tracking-tight">00:00:00</p>
+            </div>
+            <button onclick="closeNoLivesModal()" class="w-full bg-gray-700 hover:bg-gray-600 text-white font-bold py-5 rounded-2xl transition-colors text-lg">Volver al Mapa</button>
+        </div>
+    </div>
+
+    <!-- MODAL DE ÉXITO -->
+    <div id="success-modal" class="fixed inset-0 bg-black/90 backdrop-blur-md z-[200] hidden items-center justify-center p-6">
+        <div class="bg-[#151E2E] border border-purple-500/30 p-10 rounded-[2rem] max-w-md w-full text-center shadow-[0_0_100px_rgba(168,85,247,0.2)]">
+            <div class="w-28 h-28 bg-purple-500/20 rounded-full flex items-center justify-center mx-auto mb-8">
+                <i class="ph-fill ph-medal text-7xl text-purple-400"></i>
+            </div>
+            <h3 class="text-4xl font-black mb-4 text-white tracking-tight">¡Dominado!</h3>
+            <p class="text-gray-300 text-lg mb-8">Has interiorizado el concepto correctamente. Tu cerebro está creando nuevas conexiones.</p>
+            <button onclick="finishClass()" class="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold py-5 rounded-2xl transition-all text-xl shadow-[0_4px_0_rgb(147,51,234)] hover:translate-y-[2px] active:shadow-none">
+                Continuar Avanzando
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // LÓGICA DEL SIDEBAR 
+        // ==========================================
+        const sidebar = document.getElementById('sidebar');
+        const toggleBtn = document.getElementById('toggleSidebar');
+        const sidebarTexts = document.querySelectorAll('.sidebar-text');
+        const backdrop = document.getElementById('mobile-backdrop');
+        
+        let isSidebarOpen = window.innerWidth > 768;
+        
+        function updateSidebarVisuals() {
+            if (isSidebarOpen) {
+                sidebar.classList.remove('w-20');
+                sidebar.classList.add('w-64');
+                setTimeout(() => {
+                    sidebarTexts.forEach(text => {
+                        text.classList.remove('hidden');
+                        setTimeout(() => text.classList.remove('opacity-0'), 50);
+                    });
+                }, 150);
+                
+                if (window.innerWidth <= 768 && backdrop) {
+                    backdrop.classList.remove('hidden');
+                    setTimeout(() => backdrop.classList.remove('opacity-0'), 10);
+                }
+            } else {
+                sidebarTexts.forEach(text => {
+                    text.classList.add('opacity-0');
+                    setTimeout(() => text.classList.add('hidden'), 200);
+                });
+                sidebar.classList.remove('w-64');
+                sidebar.classList.add('w-20');
+                
+                if (backdrop) {
+                    backdrop.classList.add('opacity-0');
+                    setTimeout(() => backdrop.classList.add('hidden'), 300);
+                }
+            }
+        }
+
+        toggleBtn.addEventListener('click', () => {
+            isSidebarOpen = !isSidebarOpen;
+            updateSidebarVisuals();
+        });
+
+        if (window.innerWidth <= 768) {
+            updateSidebarVisuals(); 
+        }
+
+        window.addEventListener('resize', () => {
+            if (window.innerWidth > 768) {
+                if (backdrop) backdrop.classList.add('hidden', 'opacity-0');
+            } else {
+                if (isSidebarOpen) {
+                    isSidebarOpen = false; 
+                    updateSidebarVisuals();
+                }
+            }
+        });
+
+        // ==========================================
+        // DICCIONARIO PEDAGÓGICO DE DESGLOSE (EL PROFESOR VIRTUAL)
+        // ==========================================
+        const vocabularyAndGrammarDB = {
+            "i": "<strong class='text-blue-400 text-lg'>I (Yo):</strong> En inglés es <b>estrictamente obligatorio</b> mencionar quién hace la acción. Mientras en español dices 'soy feliz', en inglés debes decir 'Yo soy feliz'. Además, la 'I' <b>siempre</b> se escribe en mayúscula, sin importar dónde esté en la frase.",
+            "am": "<strong class='text-purple-400 text-lg'>am (soy / estoy):</strong> Es una forma especial del verbo 'To Be'. Piensa en 'am' como un traje hecho a la medida exclusivo para 'I'. Nunca nadie más puede usar 'am'.",
+            "you": "<strong class='text-blue-400 text-lg'>You (Tú / Usted / Ustedes):</strong> Pronombre muy versátil. La regla de oro es que el inglés lo trata <b>siempre como si fuera plural</b>, incluso si hablas con una sola persona.",
+            "are": "<strong class='text-purple-400 text-lg'>are (eres / estás / son / están):</strong> Es el verbo To Be asignado a los plurales (y a 'You'). Su trabajo es conectar a las personas con lo que son o dónde están.",
+            "he": "<strong class='text-blue-400 text-lg'>He (Él):</strong> Pronombre exclusivo para un individuo masculino. Pertenece a la 'Tercera Persona' (de quien hablamos).",
+            "she": "<strong class='text-blue-400 text-lg'>She (Ella):</strong> Pronombre exclusivo para un individuo femenino. También es 'Tercera Persona'.",
+            "it": "<strong class='text-blue-400 text-lg'>It (Eso / Ello):</strong> ¡Súper importante! Se usa para 1 cosa, 1 animal o el clima. En español decimos 'Es un perro', pero en inglés no puedes dejar la frase vacía, DEBES decir 'It is a dog' (Eso es un perro).",
+            "is": "<strong class='text-purple-400 text-lg'>is (es / está):</strong> El verbo To Be diseñado únicamente para He, She y It (los singulares de tercera persona).",
+            "we": "<strong class='text-blue-400 text-lg'>We (Nosotros):</strong> Pronombre de grupo que te incluye a ti.",
+            "they": "<strong class='text-blue-400 text-lg'>They (Ellos / Ellas / Esos):</strong> Pronombre plural. A diferencia de He/She/It, 'They' sirve para varias personas, varios animales o varias cosas por igual.",
+            "do": "<strong class='text-emerald-400 text-lg'>do:</strong> Un 'Auxiliar'. Los verbos normales (jugar, comer) son débiles en inglés. Para hacer preguntas o negar, necesitan que el ayudante 'do' venga a soportar la estructura de la oración.",
+            "does": "<strong class='text-emerald-400 text-lg'>does:</strong> Es el mismo 'do', pero modificado con una 's' para trabajar exclusivamente con He, She o It.",
+            "not": "<strong class='text-red-400 text-lg'>not (no):</strong> La pieza clave para negar. Casi nunca puede ir suelta; necesita agarrarse de un verbo To Be (is not) o de un auxiliar (do not).",
+            "will": "<strong class='text-orange-400 text-lg'>will:</strong> Una 'Máquina del tiempo'. No significa nada solo, pero cuando lo pones antes de un verbo, lo proyecta hacia el futuro de forma instantánea. (ej. <i>will play</i> = jugará).",
+            "can": "<strong class='text-pink-400 text-lg'>can (poder):</strong> Un verbo modal de habilidad. Es como un superhéroe: no necesita de 'do' para preguntar ni de 'don't' para negar. Se defiende y acomoda solo.",
+            "should": "<strong class='text-pink-400 text-lg'>should (debería):</strong> Verbo modal utilizado para dar consejos suaves. Va pegado directo al verbo de acción.",
+            "must": "<strong class='text-pink-400 text-lg'>must (deber / obligación):</strong> Verbo modal de obligación fuerte o necesidad imperiosa.",
+            "might": "<strong class='text-pink-400 text-lg'>might (podría / tal vez):</strong> Verbo modal que indica probabilidad o que algo tal vez suceda.",
+            "did": "<strong class='text-emerald-400 text-lg'>did:</strong> El ayudante del pasado. Cuando lo usas en preguntas (Did you...?) o negaciones (didn't), el verbo principal ya no necesita cambiar, 'did' absorbe todo el tiempo pasado.",
+            "what": "<strong class='text-yellow-400 text-lg'>What (Qué):</strong> Palabra interrogativa. Cuando hace preguntas, exige ser la primera palabra de toda la oración, desplazando a todo lo demás.",
+            "where": "<strong class='text-yellow-400 text-lg'>Where (Dónde):</strong> Palabra interrogativa de ubicación. Siempre lidera la oración interrogativa.",
+            "a": "<strong class='text-gray-300 text-lg'>a (un / una):</strong> Artículo indefinido. En inglés es estrictamente obligatorio usarlo para indicar profesiones (ej. soy <b>un</b> doctor).",
+            "an": "<strong class='text-gray-300 text-lg'>an (un / una):</strong> Igual que 'a', pero se usa cuando la siguiente palabra empieza con sonido de vocal (ej. <b>an</b> apple) para que suene fluido.",
+            "going": "<strong class='text-orange-300 text-lg'>going to (voy a / vas a):</strong> Estructura inseparable para planes futuros confirmados. Siempre va de la mano con el verbo To Be (am/is/are).",
+            "have": "<strong class='text-teal-400 text-lg'>have (tener / haber):</strong> Puede ser el verbo de poseer algo, o un ayudante gramatical para decir 'Yo he estado...'.",
+            "to": "<strong class='text-gray-300 text-lg'>to:</strong> Conector muy común que muchas veces indica el infinitivo de un verbo (su forma base, terminada en -ar, -er, -ir en español).",
+            "in": "<strong class='text-indigo-400 text-lg'>in (en / dentro):</strong> Preposición usada para espacios tridimensionales contenidos (cajas, habitaciones, ciudades) o periodos de tiempo largos (meses, años).",
+            "on": "<strong class='text-indigo-400 text-lg'>on (en / sobre):</strong> Preposición para cosas que descansan sobre una superficie plana sin estar adentro, y <b>obligatoria</b> para todos los días de la semana.",
+            "at": "<strong class='text-indigo-400 text-lg'>at (en / punto exacto):</strong> Preposición de francotirador. Para horas exactas del reloj (6:00 pm) o puntos de referencia específicos en el mapa (la puerta).",
+            "but": "<strong class='text-amber-400 text-lg'>but (pero):</strong> El conector más común para mostrar un contraste directo entre dos ideas opuestas.",
+            "because": "<strong class='text-amber-400 text-lg'>because (porque):</strong> Se usa exclusivamente para responder o dar una razón. No se usa para preguntar (eso lo hace 'Why')."
+        };
+
+        function generatePieceByPiece(phrase) {
+            let words = phrase.split(/[\s?.,!]+/);
+            let html = "";
+            let explained = new Set();
+            let minorVocab = [];
+
+            words.forEach(w => {
+                let lower = w.toLowerCase();
+                if (!lower) return;
+
+                if (vocabularyAndGrammarDB[lower] && !explained.has(lower)) {
+                    html += `<div class="bg-[#0B1120] p-4 rounded-xl border border-[#2A3B52] text-gray-300 leading-relaxed shadow-inner hover:border-blue-500/50 transition-colors mb-3">
+                                ${vocabularyAndGrammarDB[lower]}
+                             </div>`;
+                    explained.add(lower);
+                } else if (!explained.has(lower) && lower.length > 1) {
+                    // Fallback dinámico para vocabulario general que no está en la base de datos
+                    minorVocab.push(w);
+                    explained.add(lower);
+                }
+            });
+
+            if (minorVocab.length > 0) {
+                html += `<div class="bg-[#0B1120] p-4 rounded-xl border border-[#2A3B52] text-gray-400 text-sm shadow-inner hover:border-blue-500/50 transition-colors mt-2">
+                            <strong class='text-gray-200'>Vocabulario de apoyo:</strong> ${minorVocab.join(', ')}
+                         </div>`;
+            }
+
+            return html;
+        }
+
+        // ==========================================
+        // 1. SISTEMA DE VIDAS 
+        // ==========================================
+        const SUPABASE_BACKEND = window.LinguoSupabase || null;
+        const MAX_LIVES = 5;
+        const REGEN_TIME_MS = 2 * 60 * 1000;
+        const ACTIVITY_LOG_MAX_DAYS = 120;
+        const VOCAB_MASTERED_THRESHOLD = 85;
+        const VOCAB_REVIEW_THRESHOLD = 60;
+        const VOCAB_MIN_ATTEMPTS_TO_MASTER = 3;
+        const STUDY_PERSIST_INTERVAL_MS = 30000;
+        const FEEDBACK_AUDIO = {
+            correct: new Audio('audio/correct.mp3'),
+            incorrect: new Audio('audio/incorrect.mp3')
+        };
+
+        Object.values(FEEDBACK_AUDIO).forEach((audio) => {
+            audio.preload = 'auto';
+            audio.volume = 0.85;
+        });
+
+        function playFeedbackSound(type) {
+            const sound = FEEDBACK_AUDIO[type];
+            if (!sound) return;
+            try {
+                sound.currentTime = 0;
+                const playback = sound.play();
+                if (playback && typeof playback.catch === 'function') {
+                    playback.catch(() => {});
+                }
+            } catch (error) {}
+        }
+
+        function getExerciseAudioText(exercise) {
+            if (!exercise) return '';
+            if (exercise.audioText) return String(exercise.audioText);
+            if (exercise.lessonRef && exercise.lessonRef.en) return String(exercise.lessonRef.en);
+            if (exercise.correct) return String(exercise.correct);
+            return '';
+        }
+
+        function pickVoiceForLang(langPrefix) {
+            const voices = window.speechSynthesis.getVoices() || [];
+            if (!voices.length) return null;
+            const normalizedPrefix = String(langPrefix || '').toLowerCase();
+
+            return voices.find((voice) => {
+                const voiceLang = String(voice.lang || '').toLowerCase();
+                return voiceLang.startsWith(normalizedPrefix)
+                    && /(google|microsoft|natural|enhanced|samantha|zira|aria)/i.test(String(voice.name || ''));
+            }) || voices.find((voice) => String(voice.lang || '').toLowerCase().startsWith(normalizedPrefix)) || null;
+        }
+
+        function playExerciseAudio(text, forcedLang = '') {
+            const phrase = String(text || '').trim();
+            if (!phrase || !('speechSynthesis' in window)) return;
+            window.speechSynthesis.cancel();
+            const utterance = new SpeechSynthesisUtterance(phrase);
+            const isLikelySpanish = /[^\x00-\x7F]/.test(phrase)
+                || /\b(yo|tu|el|ella|nosotros|ellos|que|como|donde|cuando)\b/i.test(phrase);
+            const safeForcedLang = String(forcedLang || '').trim();
+            const resolvedLang = safeForcedLang || (isLikelySpanish ? 'es-DO' : 'en-US');
+            utterance.lang = resolvedLang;
+            const preferredVoice = pickVoiceForLang(resolvedLang.toLowerCase().startsWith('es') ? 'es' : 'en');
+            if (preferredVoice) utterance.voice = preferredVoice;
+
+            const wordsCount = phrase.split(/\s+/).filter(Boolean).length;
+            utterance.rate = wordsCount <= 2 ? 0.72 : 0.82;
+            utterance.pitch = 1;
+            utterance.volume = 1;
+            window.speechSynthesis.speak(utterance);
+        }
+
+        function playCurrentExerciseAudio() {
+            const exercise = classExercises[currentExerciseIndex];
+            if (!exercise) return;
+            playExerciseAudio(getExerciseAudioText(exercise), exercise.audioLang || '');
+        }
+
+        function playCurrentOrderPhrase() {
+            const phrase = orderSelectedWords.join(' ').trim();
+            if (!phrase) return;
+            playExerciseAudio(phrase);
+        }
+
+        function normalizeEmail(email) { return (email || '').trim().toLowerCase(); }
+
+        function cloneSerializable(value, fallbackValue = {}) {
+            try {
+                return JSON.parse(JSON.stringify(value ?? fallbackValue));
+            } catch (error) {
+                return JSON.parse(JSON.stringify(fallbackValue));
+            }
+        }
+
+        let activeUser = null;
+        let canPersistProgress = false;
+        let progressStorageEmail = '';
+        let progressSaveTimer = null;
+        let latestProgressSnapshot = null;
+
+        function canPersistCurrentProgress() {
+            return Boolean(
+                canPersistProgress &&
+                activeUser &&
+                !activeUser.isGuest &&
+                activeUser.id &&
+                SUPABASE_BACKEND &&
+                SUPABASE_BACKEND.isReady()
+            );
+        }
+
+        function queueProgressSave(snapshot) {
+            if (!canPersistCurrentProgress()) return;
+            latestProgressSnapshot = cloneSerializable(snapshot, {});
+            if (progressSaveTimer) {
+                clearTimeout(progressSaveTimer);
+            }
+            progressSaveTimer = setTimeout(async () => {
+                progressSaveTimer = null;
+                if (!latestProgressSnapshot || !canPersistCurrentProgress()) return;
+                const payload = cloneSerializable(latestProgressSnapshot, {});
+                latestProgressSnapshot = null;
+                await SUPABASE_BACKEND.saveProgress(payload);
+            }, 450);
+        }
+
+        async function flushProgressSave() {
+            if (progressSaveTimer) {
+                clearTimeout(progressSaveTimer);
+                progressSaveTimer = null;
+            }
+            if (!latestProgressSnapshot || !canPersistCurrentProgress()) return;
+            const payload = cloneSerializable(latestProgressSnapshot, {});
+            latestProgressSnapshot = null;
+            await SUPABASE_BACKEND.saveProgress(payload);
+        }
+
+        async function handleLogout(event) {
+            if (event) event.preventDefault();
+            persistStudyTime(false);
+            await flushProgressSave();
+            if (SUPABASE_BACKEND && SUPABASE_BACKEND.isReady()) {
+                await SUPABASE_BACKEND.signOut();
+            }
+            window.location.href = 'index.html';
+        }
+
+        async function getActiveUser() {
+            if (!SUPABASE_BACKEND || !SUPABASE_BACKEND.isReady()) return null;
+            const { user, error } = await SUPABASE_BACKEND.getCurrentIdentity();
+            if (error || !user) return null;
+            return { ...user, email: normalizeEmail(user.email) };
+        }
+
+        function clampNumber(value, min, max) {
+            return Math.min(max, Math.max(min, value));
+        }
+
+        function normalizeQuizStats(stats) {
+            const safeStats = stats || {};
+            const answered = Math.max(0, parseInt(safeStats.answered) || 0);
+            const correctRaw = Math.max(0, parseInt(safeStats.correct) || 0);
+            const correct = Math.min(answered, correctRaw);
+            const currentStreakRaw = Math.max(0, parseInt(safeStats.currentStreak) || 0);
+            const bestStreakRaw = Math.max(0, parseInt(safeStats.bestStreak) || 0);
+            const currentStreak = Math.min(correct, currentStreakRaw);
+            const bestStreak = Math.max(currentStreak, Math.min(correct, bestStreakRaw));
+            return { answered, correct, currentStreak, bestStreak };
+        }
+
+        function normalizeAchievementStats(stats) {
+            const safeStats = stats || {};
+            const perfectLessons = Math.max(0, parseInt(safeStats.perfectLessons) || 0);
+            const currentPerfectStreak = Math.max(0, parseInt(safeStats.currentPerfectStreak) || 0);
+            const bestPerfectStreak = Math.max(
+                currentPerfectStreak,
+                Math.max(0, parseInt(safeStats.bestPerfectStreak) || 0)
+            );
+            const studyStreak = Math.max(0, parseInt(safeStats.studyStreak) || 0);
+            const longestStudyStreak = Math.max(studyStreak, Math.max(0, parseInt(safeStats.longestStudyStreak) || 0));
+            const lastStudyDate = typeof safeStats.lastStudyDate === 'string' ? safeStats.lastStudyDate : '';
+            return {
+                perfectLessons,
+                currentPerfectStreak,
+                bestPerfectStreak,
+                studyStreak,
+                longestStudyStreak,
+                lastStudyDate
+            };
+        }
+
+        function normalizeAchievementsUnlocked(unlocked) {
+            const flags = unlocked || {};
+            return {
+                firstSteps: Boolean(flags.firstSteps),
+                brightMind: Boolean(flags.brightMind),
+                fireStreak: Boolean(flags.fireStreak),
+                globalMaster: Boolean(flags.globalMaster)
+            };
+        }
+
+        function getDateKey(date = new Date()) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
+        function getVocabStorageKey(lessonId) {
+            return `lesson_${lessonId}`;
+        }
+
+        function normalizeLessonMetric(metric) {
+            const safeMetric = metric || {};
+            const attemptsRaw = Math.max(0, parseInt(safeMetric.attempts ?? safeMetric.answered ?? safeMetric.total) || 0);
+            const correctRaw = Math.max(0, parseInt(safeMetric.correct ?? safeMetric.right ?? safeMetric.success ?? safeMetric.ok) || 0);
+            const wrongRaw = Math.max(0, parseInt(safeMetric.wrong ?? safeMetric.errors ?? safeMetric.fail ?? safeMetric.incorrect) || 0);
+            const attempts = Math.max(attemptsRaw, correctRaw + wrongRaw);
+            const correct = clampNumber(correctRaw, 0, attempts);
+            const wrong = Math.max(wrongRaw, Math.max(0, attempts - correct));
+            const masteryRaw = parseInt(safeMetric.mastery);
+            const mastery = Number.isFinite(masteryRaw)
+                ? clampNumber(masteryRaw, 0, 100)
+                : (attempts ? clampNumber(Math.round((correct / attempts) * 100), 0, 100) : 0);
+            const lastAttemptAt = Math.max(0, parseInt(safeMetric.lastAttemptAt) || 0);
+            return { attempts, correct, wrong, mastery, lastAttemptAt };
+        }
+
+        function normalizeLessonStats(stats) {
+            const source = (stats && typeof stats === 'object') ? stats : {};
+            const normalized = {};
+
+            Object.keys(source).forEach((rawKey) => {
+                const numericKey = parseInt(String(rawKey).replace('lesson_', ''), 10);
+                if (!Number.isFinite(numericKey) || numericKey <= 0) {
+                    return;
+                }
+                normalized[String(numericKey)] = normalizeLessonMetric(source[rawKey]);
+            });
+
+            return normalized;
+        }
+
+        function normalizeVocabRecord(record) {
+            const safeRecord = record || {};
+            const attempts = Math.max(0, parseInt(safeRecord.attempts) || 0);
+            const correctRaw = Math.max(0, parseInt(safeRecord.correct) || 0);
+            const wrongRaw = Math.max(0, parseInt(safeRecord.wrong) || 0);
+            const reveals = Math.max(0, parseInt(safeRecord.reveals) || 0);
+            const consecutiveWrong = Math.max(0, parseInt(safeRecord.consecutiveWrong) || 0);
+            const attemptsNormalized = Math.max(attempts, correctRaw + wrongRaw);
+            const correct = clampNumber(correctRaw, 0, attemptsNormalized);
+            const wrong = Math.max(wrongRaw, Math.max(0, attemptsNormalized - correct));
+            const masteryRaw = parseInt(safeRecord.mastery);
+            const mastery = Number.isFinite(masteryRaw)
+                ? clampNumber(masteryRaw, 0, 100)
+                : (attemptsNormalized ? clampNumber(Math.round((correct / attemptsNormalized) * 100), 0, 100) : 0);
+
+            return {
+                attempts: attemptsNormalized,
+                correct,
+                wrong,
+                reveals,
+                consecutiveWrong,
+                mastery,
+                needsReview: Boolean(safeRecord.needsReview),
+                lastSeenLesson: Math.max(0, parseInt(safeRecord.lastSeenLesson) || 0),
+                lastInteraction: Math.max(0, parseInt(safeRecord.lastInteraction) || 0)
+            };
+        }
+
+        function normalizeVocabProgress(vocabProgress) {
+            const source = (vocabProgress && typeof vocabProgress === 'object') ? vocabProgress : {};
+            const normalized = {};
+            Object.keys(source).forEach((key) => {
+                if (!key) {
+                    return;
+                }
+                normalized[key] = normalizeVocabRecord(source[key]);
+            });
+            return normalized;
+        }
+
+        function normalizeActivityLog(activityLog) {
+            const source = (activityLog && typeof activityLog === 'object') ? activityLog : {};
+            const normalized = {};
+            const cutoff = new Date();
+            cutoff.setDate(cutoff.getDate() - ACTIVITY_LOG_MAX_DAYS);
+            const cutoffKey = getDateKey(cutoff);
+
+            Object.keys(source).forEach((dayKey) => {
+                if (!/^\d{4}-\d{2}-\d{2}$/.test(dayKey) || dayKey < cutoffKey) {
+                    return;
+                }
+
+                const value = Math.max(0, parseInt(source[dayKey]) || 0);
+                if (value > 0) {
+                    normalized[dayKey] = value;
+                }
+            });
+
+            return normalized;
+        }
+
+        function normalizeStudyByDay(studyByDay) {
+            const source = (studyByDay && typeof studyByDay === 'object') ? studyByDay : {};
+            const normalized = {};
+            const cutoff = new Date();
+            cutoff.setDate(cutoff.getDate() - ACTIVITY_LOG_MAX_DAYS);
+            const cutoffKey = getDateKey(cutoff);
+
+            Object.keys(source).forEach((dayKey) => {
+                if (!/^\d{4}-\d{2}-\d{2}$/.test(dayKey) || dayKey < cutoffKey) {
+                    return;
+                }
+
+                const value = Math.max(0, parseInt(source[dayKey]) || 0);
+                if (value > 0) {
+                    normalized[dayKey] = value;
+                }
+            });
+
+            return normalized;
+        }
+
+        function getDefaultProgressState() {
+            return {
+                unlockedLevel: 1,
+                lives: MAX_LIVES,
+                nextLifeTime: 0,
+                quizStats: normalizeQuizStats({ answered: 0, correct: 0, currentStreak: 0, bestStreak: 0 }),
+                achievementStats: normalizeAchievementStats({ perfectLessons: 0, currentPerfectStreak: 0, bestPerfectStreak: 0, studyStreak: 0, longestStudyStreak: 0, lastStudyDate: '' }),
+                achievementsUnlocked: normalizeAchievementsUnlocked({}),
+                lessonStats: normalizeLessonStats({}),
+                vocabProgress: normalizeVocabProgress({}),
+                activityLog: normalizeActivityLog({}),
+                studyByDay: normalizeStudyByDay({}),
+                studyTimeMs: 0,
+                studyGoal: '25 min',
+                targetLevel: 'b1',
+                profileSettings: {
+                    rememberLastView: true,
+                    reduceMotion: false,
+                    autoPronounce: false,
+                    lastView: ''
+                }
+            };
+        }
+
+        function normalizeProgressSnapshot(progress) {
+            const defaults = getDefaultProgressState();
+            const source = progress || {};
+            const mergedProgress = {
+                ...defaults,
+                ...source,
+                quizStats: normalizeQuizStats(source.quizStats || defaults.quizStats),
+                achievementStats: normalizeAchievementStats(source.achievementStats || defaults.achievementStats),
+                achievementsUnlocked: normalizeAchievementsUnlocked(source.achievementsUnlocked || defaults.achievementsUnlocked),
+                lessonStats: normalizeLessonStats(source.lessonStats || defaults.lessonStats),
+                vocabProgress: normalizeVocabProgress(source.vocabProgress || defaults.vocabProgress),
+                activityLog: normalizeActivityLog(source.activityLog || defaults.activityLog),
+                studyByDay: normalizeStudyByDay(source.studyByDay || defaults.studyByDay),
+                studyTimeMs: Math.max(0, parseInt(source.studyTimeMs) || 0),
+                studyGoal: (typeof source.studyGoal === 'string' && source.studyGoal.trim()) ? source.studyGoal.trim() : defaults.studyGoal,
+                targetLevel: (typeof source.targetLevel === 'string' && source.targetLevel.trim()) ? source.targetLevel.trim() : defaults.targetLevel,
+                profileSettings: (source.profileSettings && typeof source.profileSettings === 'object')
+                    ? source.profileSettings
+                    : defaults.profileSettings
+            };
+
+            mergedProgress.unlockedLevel = Math.min(111, Math.max(1, parseInt(mergedProgress.unlockedLevel) || 1));
+            mergedProgress.lives = Math.min(MAX_LIVES, Math.max(0, parseInt(mergedProgress.lives) || MAX_LIVES));
+            mergedProgress.nextLifeTime = Math.max(0, parseInt(mergedProgress.nextLifeTime) || 0);
+            if (mergedProgress.lives >= MAX_LIVES) {
+                mergedProgress.nextLifeTime = 0;
+            } else if (mergedProgress.nextLifeTime > 0) {
+                // Compatibilidad: evita conservar timers largos de versiones anteriores.
+                const maxExpectedNextLife = Date.now() + REGEN_TIME_MS;
+                if (mergedProgress.nextLifeTime > maxExpectedNextLife) {
+                    mergedProgress.nextLifeTime = maxExpectedNextLife;
+                }
+            }
+            return mergedProgress;
+        }
+
+        async function getInitialProgress(email, shouldPersistProgress = true) {
+            const defaultProgress = normalizeProgressSnapshot(getDefaultProgressState());
+            if (!shouldPersistProgress || !email || !SUPABASE_BACKEND || !SUPABASE_BACKEND.isReady()) {
+                return defaultProgress;
+            }
+
+            const { progress, error } = await SUPABASE_BACKEND.loadProgress(defaultProgress);
+            if (error) return defaultProgress;
+            return normalizeProgressSnapshot(progress);
+        }
+
+        let globalLives = MAX_LIVES;
+        let nextLifeTime = 0;
+        let unlockedLevel = 1;
+        let quizStats = normalizeQuizStats({ answered: 0, correct: 0, currentStreak: 0, bestStreak: 0 });
+        let achievementStats = normalizeAchievementStats({ perfectLessons: 0, currentPerfectStreak: 0, bestPerfectStreak: 0, studyStreak: 0, longestStudyStreak: 0, lastStudyDate: '' });
+        let achievementsUnlocked = normalizeAchievementsUnlocked({});
+        let lessonStats = normalizeLessonStats({});
+        let vocabProgress = normalizeVocabProgress({});
+        let activityLog = normalizeActivityLog({});
+        let studyByDay = normalizeStudyByDay({});
+        let studyTimeMs = 0;
+        let studyGoalPreference = '25 min';
+        let targetLevelPreference = 'b1';
+        let profileSettingsPreference = {
+            rememberLastView: true,
+            reduceMotion: false,
+            autoPronounce: false,
+            lastView: ''
+        };
+
+        function saveCurrentProgress() {
+            const snapshot = {
+                unlockedLevel: Math.min(111, Math.max(1, parseInt(unlockedLevel) || 1)),
+                lives: Math.min(MAX_LIVES, Math.max(0, parseInt(globalLives) || MAX_LIVES)),
+                nextLifeTime: Math.max(0, parseInt(nextLifeTime) || 0),
+                quizStats: normalizeQuizStats(quizStats),
+                achievementStats: normalizeAchievementStats(achievementStats),
+                achievementsUnlocked: normalizeAchievementsUnlocked(achievementsUnlocked),
+                lessonStats: normalizeLessonStats(lessonStats),
+                vocabProgress: normalizeVocabProgress(vocabProgress),
+                activityLog: normalizeActivityLog(activityLog),
+                studyByDay: normalizeStudyByDay(studyByDay),
+                studyTimeMs: Math.max(0, parseInt(studyTimeMs) || 0),
+                studyGoal: studyGoalPreference,
+                targetLevel: targetLevelPreference,
+                profileSettings: profileSettingsPreference
+            };
+
+            quizStats = snapshot.quizStats;
+            achievementStats = snapshot.achievementStats;
+            achievementsUnlocked = snapshot.achievementsUnlocked;
+            lessonStats = snapshot.lessonStats;
+            vocabProgress = snapshot.vocabProgress;
+            activityLog = snapshot.activityLog;
+            studyByDay = snapshot.studyByDay;
+            studyTimeMs = snapshot.studyTimeMs;
+
+            if (!canPersistCurrentProgress()) return;
+            queueProgressSave(snapshot);
+        }
+
+        function registerDailyActivity(points = 1) {
+            const today = getDateKey();
+            activityLog = normalizeActivityLog(activityLog);
+            activityLog[today] = Math.max(0, parseInt(activityLog[today]) || 0) + Math.max(1, parseInt(points) || 1);
+        }
+
+        function registerStudyDay(activityPoints = 1) {
+            achievementStats = normalizeAchievementStats(achievementStats);
+            achievementsUnlocked = normalizeAchievementsUnlocked(achievementsUnlocked);
+            registerDailyActivity(activityPoints);
+            const today = getDateKey(new Date());
+
+            if (achievementStats.lastStudyDate !== today) {
+                const yesterdayDate = new Date();
+                yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+                const yesterday = getDateKey(yesterdayDate);
+
+                if (achievementStats.lastStudyDate === yesterday) achievementStats.studyStreak += 1;
+                else achievementStats.studyStreak = 1;
+
+                achievementStats.longestStudyStreak = Math.max(achievementStats.longestStudyStreak, achievementStats.studyStreak);
+                achievementStats.lastStudyDate = today;
+            }
+
+            if (achievementStats.studyStreak >= 7) achievementsUnlocked.fireStreak = true;
+            saveCurrentProgress();
+        }
+
+        function saveLives() {
+            saveCurrentProgress();
+        }
+
+        function loseLife() {
+            if (globalLives > 0) {
+                globalLives--;
+                if (globalLives < MAX_LIVES && nextLifeTime === 0) nextLifeTime = Date.now() + REGEN_TIME_MS;
+                saveLives(); renderLivesUI();
+            }
+        }
+
+        function updateLivesLogic() {
+            const now = Date.now();
+            if (globalLives < MAX_LIVES && nextLifeTime > 0) {
+                if (now >= nextLifeTime) {
+                    const timePassed = now - (nextLifeTime - REGEN_TIME_MS);
+                    const livesRecovered = Math.floor(timePassed / REGEN_TIME_MS);
+                    globalLives = Math.min(MAX_LIVES, globalLives + livesRecovered);
+                    if (globalLives < MAX_LIVES) nextLifeTime = now + (REGEN_TIME_MS - (timePassed % REGEN_TIME_MS));
+                    else nextLifeTime = 0;
+                    saveLives();
+                }
+            }
+            renderLivesUI();
+        }
+
+        function formatTime(ms) {
+            if (ms <= 0) return "00:00";
+            const totalSec = Math.floor(ms / 1000);
+            const m = String(Math.floor(totalSec / 60)).padStart(2, '0');
+            const s = String(totalSec % 60).padStart(2, '0');
+            return `${m}:${s}`;
+        }
+
+        function renderLivesUI() {
+            document.getElementById('header-lives-count').innerText = globalLives;
+            const classLivesContainer = document.getElementById('lives-container');
+            const headerTimer = document.getElementById('header-lives-timer');
+            
+            if (globalLives < MAX_LIVES) {
+                headerTimer.classList.remove('hidden');
+                const msLeft = nextLifeTime - Date.now();
+                headerTimer.innerText = formatTime(msLeft);
+                document.getElementById('modal-timer').innerText = `00:${formatTime(msLeft)}`;
+            } else { headerTimer.classList.add('hidden'); }
+
+            if (classLivesContainer) {
+                classLivesContainer.innerHTML = '';
+                for (let i = 0; i < MAX_LIVES; i++) {
+                    classLivesContainer.innerHTML += i < globalLives 
+                        ? `<i class="ph-fill ph-heart text-2xl heart-active drop-shadow-md"></i>` 
+                        : `<i class="ph-fill ph-heart text-2xl heart-lost opacity-30"></i>`;
+                }
+            }
+        }
+        setInterval(updateLivesLogic, 1000);
+
+        let activeLevelsSessionStartedAt = Date.now();
+
+        function persistStudyTime(resetStart = true) {
+            if (!activeLevelsSessionStartedAt) {
+                if (resetStart) activeLevelsSessionStartedAt = Date.now();
+                return;
+            }
+
+            const now = Date.now();
+            const elapsed = now - activeLevelsSessionStartedAt;
+            if (elapsed >= 1000) {
+                const today = getDateKey();
+                studyTimeMs += elapsed;
+                studyByDay = normalizeStudyByDay(studyByDay);
+                studyByDay[today] = Math.max(0, parseInt(studyByDay[today]) || 0) + elapsed;
+                saveCurrentProgress();
+            }
+
+            activeLevelsSessionStartedAt = resetStart ? now : 0;
+        }
+
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                persistStudyTime(false);
+                flushProgressSave();
+                return;
+            }
+            activeLevelsSessionStartedAt = Date.now();
+        });
+
+        window.addEventListener('beforeunload', () => {
+            persistStudyTime(false);
+            flushProgressSave();
+        });
+
+        setInterval(() => {
+            if (!document.hidden) {
+                persistStudyTime(true);
+            }
+        }, STUDY_PERSIST_INTERVAL_MS);
+
+        // ==========================================
+        // 2. BASE DE DATOS PEDAGÓGICA
+        // ==========================================
+        function generateDeepDatabase() {
+            let db = [];
+            let classId = 1;
+
+            const worlds = [
+                {
+                    world: 1, title: "1. El Pilar: Verbo To Be",
+                    introTitle: "El Motor del Inglés: To Be",
+                    introDesc: "Bienvenido al primer paso hacia la fluidez. El verbo 'To Be' significa 'Ser' o 'Estar'. En español usamos dos verbos distintos (yo soy, yo estoy), pero en inglés es uno solo. Es el verbo más importante y el único que cambia su forma dependiendo de quién realiza la acción (am, are, is). Entender esto te dará el 30% del idioma.",
+                    items: [
+                        ["I am happy", "Yo soy feliz", "Am happy", "El Pilar: Yo soy / estoy", "En inglés siempre debes decir quién hace la acción. 'I' (Yo) siempre va explícito.", "El error de omitir el sujeto", "En inglés no puedes usar solo el verbo 'am'. La estructura necesita el pronombre.", "Falta 'I'"],
+                        ["You are my friend", "Tú eres mi amigo", "You is my friend", "El Pilar: Tú eres / estás", "El pronombre 'You' siempre se empareja con 'are', sea para una persona o varias.", "El error de la traducción singular", "Tu mente asocia 'tú' con singular y quiere usar 'is', pero la regla exige 'are'.", "No uses 'is' con 'You'"],
+                        ["He is tall", "Él es alto", "He are tall", "El Pilar: Tercera persona (Él)", "La trinidad del inglés: He, She, It. Estas terceras personas en singular siempre exigen 'is'.", "El error de usar plural", "A veces confundimos y usamos 'are' con un solo individuo masculino.", "He siempre usa 'is'"],
+                        ["She is a doctor", "Ella es doctora", "She is doctor", "El Pilar: Profesiones y artículos", "Al decir la profesión de alguien en inglés, siempre se requiere usar 'a' o 'an' antes de la ocupación.", "El error de omitir el artículo", "En español decimos directo 'es doctora', en inglés es obligatorio decir 'es UNA doctora'.", "Falta el artículo 'a'"],
+                        ["It is a cat", "Es un gato", "Is a cat", "El Pilar: El sujeto fantasma (It)", "Si hablas de un animal, cosa o el clima, el pronombre obligatorio y universal es 'It'.", "El error del sujeto vacío", "Decir 'es un gato' sin especificar 'It' rompe la estructura básica del inglés.", "Falta 'It'"],
+                        ["We are ready", "Nosotros estamos listos", "We are readys", "El Pilar: Adjetivos inmutables", "En inglés, las palabras que describen (adjetivos como ready) NO tienen forma plural.", "El error de pluralizar adjetivos", "Al traducir 'listos', quieres agregarle una 's' a 'ready', pero esto es un error grave.", "Adjetivos no llevan 'S'"],
+                        ["They are here", "Ellos están aquí", "They is here", "El Pilar: El plural universal (They)", "Toda frase que involucre a varias personas o cosas ('Ellos') se casa con 'are'.", "El error de usar singular con grupo", "No puedes usar 'is' si te refieres a más de una persona.", "They exige 'are'"],
+                        ["I am not sad", "Yo no estoy triste", "I no am sad", "El Pilar: La negación del To Be", "Para decir que NO, la palabra 'not' se coloca estrictamente DESPUÉS del verbo 'to be'.", "El error de negar al estilo español", "En español ponemos el 'no' antes del verbo. Hacerlo en inglés suena incomprensible.", "El 'not' va después de 'am'"],
+                        ["Are you sure?", "¿Estás seguro?", "You are sure?", "El Pilar: La inversión en preguntas", "Para preguntar, el verbo 'to be' salta y se coloca al principio de la frase.", "El error de solo cambiar la entonación", "No basta con hacer sonido de pregunta como en español. Tienes que invertir el orden.", "El verbo debe ir primero"],
+                        ["Is she okay?", "¿Ella está bien?", "She is okay?", "El Pilar: Preguntar sobre terceros", "Igual que antes: si preguntas por ella, el 'Is' toma el control y lidera la oración.", "El error de mantener el orden afirmativo", "Mantener Sujeto + Verbo en una pregunta es un error de principiante.", "Inversión obligatoria"]
+                    ]
+                },
+                {
+                    world: 2, title: "2. Presente Simple (Hábitos)",
+                    introTitle: "Tus Hábitos y Rutinas",
+                    introDesc: "El Presente Simple se usa para hablar de rutinas, hábitos o hechos generales (ej. 'Yo trabajo', 'Ella lee'). A diferencia del 'To Be', los verbos aquí son 'débiles' y necesitan de ayudantes (Do/Does) para hacer preguntas o negar. Aquí aprenderás la regla más olvidada de todo el inglés: la 'S' al final del verbo.",
+                    items: [
+                        ["I work every day", "Yo trabajo todos los días", "I works every day", "El Pilar: Verbos base con 'I'", "Cuando hablas de ti mismo, el verbo se mantiene en su estado natural, puro y sin alteraciones.", "El error de regalar 'S'", "No agregues una 'S' al verbo si el sujeto eres tú.", "'I' no lleva 's'"],
+                        ["You play tennis", "Tú juegas tenis", "You plays tennis", "El Pilar: 'You' actúa como plural", "Al igual que con 'I', el pronombre 'You' no modifica el verbo principal.", "El error de hipercorrección", "Agregar 's' a 'You' es un intento fallido de aplicar reglas de tercera persona.", "'You' no lleva 's'"],
+                        ["He plays guitar", "Él toca la guitarra", "He play guitar", "El Pilar: La 'S' de la Tercera Persona", "¡Regla de oro! Si hablas de Él, Ella o Eso en presente, el verbo DEBE llevar una 'S' al final.", "El error de ignorar la 'S'", "Es el fallo más común del mundo. Olvidar la 'S' te delata como principiante inmediatamente.", "Falta la 'S' en el verbo"],
+                        ["She watches TV", "Ella ve televisión", "She watch TV", "El Pilar: Terminaciones especiales", "Con 'She', el verbo necesita la 'S'. Como 'watch' termina en 'ch', por fonética se agrega '-es'.", "El error de dejar el verbo crudo", "Incluso con verbos que suenan complejos, la regla de tercera persona es inquebrantable.", "Debe ser 'watches'"],
+                        ["It rains a lot", "Llueve mucho", "Rains a lot", "El Pilar: El clima tiene sujeto", "En inglés el clima y los fenómenos necesitan obligatoriamente el sujeto 'It'.", "El error del verbo huérfano", "En español 'llueve' es una frase completa. En inglés es una frase rota sin su 'It'.", "Nunca omitas el 'It'"],
+                        ["We study English", "Nosotros estudiamos inglés", "We studies English", "El Pilar: Plurales sin alteraciones", "Cualquier sujeto que represente a más de una persona mantiene el verbo base.", "El error de sobre-conjugar", "Confundir la 'S' de los plurales (sustantivos) con los verbos.", "Los verbos plurales no llevan 's'"],
+                        ["They live here", "Ellos viven aquí", "They lives here", "El Pilar: 'They' es verbo base", "Al igual que 'We', 'They' jamás altera el verbo que lo acompaña.", "El error de la 'S' en plural", "La 'S' en verbos es exclusiva para singulares individuales (él, ella).", "'They' no lleva 's'"],
+                        ["I do not know", "Yo no sé", "I no know", "El Pilar: El auxiliar de negación (Do)", "Los verbos normales son débiles y requieren un guardia ('do') para combinarse con el 'not'.", "El error de negar a lo latino", "Usar solo 'no' antes de un verbo de acción es un españolismo severo.", "Usa 'do not' (don't)"],
+                        ["He does not work", "Él no trabaja", "He don't works", "El Pilar: El auxiliar absorbe la 'S'", "Para negar con He/She, 'do' se convierte en 'does'. Al hacerlo, el verbo pierde su 's'.", "El error de la doble 'S'", "Si ya usaste 'does', el verbo principal vuelve a la normalidad.", "Verbo base tras 'does'"],
+                        ["Do you like it?", "¿Te gusta?", "You like it?", "El Pilar: Preguntas de acción", "Para preguntar si alguien hace una acción, el auxiliar 'Do' abre la oración.", "El error de la pregunta vaga", "Subir el tono de voz al final de la frase no es suficiente. Necesitas el 'Do'.", "Falta el auxiliar 'Do'"]
+                    ]
+                },
+                {
+                    world: 3, title: "3. Presente Continuo (Ahora)",
+                    introTitle: "Acciones en Progreso",
+                    introDesc: "El Presente Continuo captura el momento exacto. Sirve para describir cosas que están sucediendo justo AHORA. Piensa en él como un matrimonio irrompible: siempre necesita el verbo 'To Be' (que funciona como puente) más el verbo principal terminado en '-ing' (que da la acción). Si quitas uno de los dos, la estructura colapsa.",
+                    items: [
+                        ["I am eating", "Yo estoy comiendo", "I eating", "El Pilar: La fórmula inseparable", "Necesitas dos partes: el 'am' (estoy) y el '-ing' (comiendo). Van siempre juntos.", "El error de olvidar el puente", "Decir 'I eating' es como decir 'Yo comiendo'. Suena a lenguaje de caverna.", "Falta el verbo 'am'"],
+                        ["You are running", "Tú estás corriendo", "You runing", "El Pilar: Doble consonante", "En verbos cortos (Consonante-Vocal-Consonante), doblas la última letra antes del '-ing'.", "El error ortográfico", "No doblar la consonante cambia la pronunciación en la mente del nativo.", "Falta una 'n' (running)"],
+                        ["She is sleeping", "Ella está durmiendo", "She sleep", "El Pilar: El momento presente", "Para describir lo que hace ella en este instante, el verbo debe llevar '-ing'.", "El error de mezclar tiempos", "Usar el verbo base describe una rutina, no algo que ocurre justo ahora.", "Falta el verbo to be y el ing"],
+                        ["We are watching TV", "Estamos viendo televisión", "Are watching TV", "El Pilar: Sujeto innegociable", "Aunque en español digamos 'estamos', en inglés el 'We' no puede borrarse mágicamente.", "El error del sujeto tácito", "Asumir que el verbo 'are' ya incluye a 'nosotros' de forma implícita.", "Nunca borres el 'We'"],
+                        ["They are talking", "Ellos están hablando", "They talking", "El Pilar: La conexión del verbo Be", "'They' necesita su conexión vital ('are') antes de aplicar cualquier acción en progreso.", "El error del vacío estructural", "Esquivar el verbo to be porque al hablar rápido en inglés a veces no se escucha claro.", "Falta la conexión 'are'"],
+                        ["I am not playing", "Yo no estoy jugando", "I not am playing", "El Pilar: Negación encapsulada", "El 'not' se coloca justo como un relleno de sándwich: entre el verbo To be y el verbo '-ing'.", "El error de colocar 'not' al inicio", "Intentar imitar la gramática del español donde el 'no' va antes de todo.", "El 'not' va en el medio"],
+                        ["He is not listening", "Él no está escuchando", "He doesn't listening", "El Pilar: Auxiliar exclusivo", "En este tiempo, el verbo 'To Be' hace el trabajo sucio. No necesitas a 'Do/Does'.", "El error de mezclar gramáticas", "Usar 'doesn't' (de rutinas) con un verbo en '-ing' (de progreso) es contradictorio.", "Usa 'is not', no 'doesn't'"],
+                        ["Are you coming?", "¿Vienes?", "You are coming?", "El Pilar: Inversión en progreso", "Para cuestionar una acción en desarrollo, el 'Are' salta al inicio.", "El error afirmativo con tono de duda", "Es un hábito fuerte latino mantener el orden normal e intentar preguntar con la entonación.", "El 'Are' debe liderar"],
+                        ["Is it raining?", "¿Está lloviendo?", "It is raining?", "El Pilar: Preguntar sobre el clima", "Igual que arriba: invertimos sujeto y verbo. 'Is' va al frente para abrir la pregunta sobre el clima.", "El error estático", "No mover el verbo to be destruye la estructura interrogativa.", "Inversión de Is/It requerida"],
+                        ["What are you doing?", "¿Qué estás haciendo?", "What you are doing?", "El Pilar: La palabra interrogativa manda", "Palabras como 'What' son reinas y van al inicio absoluto. Luego aplicas la regla de inversión.", "El error de ignorar la inversión", "Poner el 'What' no te exime de invertir el verbo y el sujeto después.", "El 'are' va antes que 'you'"]
+                    ]
+                },
+                {
+                    world: 4, title: "4. Pasado Simple (Ayer)",
+                    introTitle: "Acciones del Pasado",
+                    introDesc: "El Pasado Simple indica que una acción ya comenzó y ya terminó. La gran mayoría de verbos son 'regulares' y solo debes agregarles '-ed'. Sin embargo, para preguntar y negar usamos un super-auxiliar llamado 'Did'. Cuando 'Did' aparece, es tan fuerte que absorbe el pasado, dejando al verbo principal completamente normal.",
+                    items: [
+                        ["I walked home", "Yo caminé a casa", "I walk home", "El Pilar: El sufijo del pasado", "Para indicar que la acción ya concluyó, agregamos '-ed' al final del verbo regular.", "El error de hablar en presente atemporal", "Si relatas algo de ayer sin la '-ed', el oyente pensará que es tu rutina.", "Falta la terminación '-ed'"],
+                        ["She wanted water", "Ella quería agua", "She wants water", "El Pilar: Igualdad en el pasado", "A diferencia del presente, en pasado no importa si es He/She/It. Todos usan el mismo '-ed'.", "El error de mantener la regla 'S'", "Aplicar reglas de presente continuo en una narrativa que ya sucedió.", "En pasado no existe la 's'"],
+                        ["We played well", "Nosotros jugamos bien", "We play well yesterday", "El Pilar: El tiempo define al verbo", "Si el contexto temporal es pasado (ayer, anoche), el verbo DEBE reflejarlo con '-ed'.", "El error de depender de la palabra de tiempo", "Creer que decir 'yesterday' basta para poner la oración en pasado.", "El verbo debe mutar a 'played'"],
+                        ["I went there", "Yo fui allí", "I goed there", "El Pilar: Los rebeldes irregulares", "Existen verbos que no aceptan el '-ed'. Cambian su forma entera. 'Go' se transforma en 'went'.", "El error de forzar la regla regular", "Aplicar '-ed' a verbos irregulares demuestra falta de vocabulario.", "Irregular puro: 'went'"],
+                        ["He ate a lot", "Él comió mucho", "He eated a lot", "El Pilar: Memorización necesaria", "Otro verbo rebelde. 'Eat' (comer) se transforma mágicamente en 'ate'.", "El error lógico pero gramaticalmente falso", "Decir 'eated' tiene lógica, pero no existe en el idioma inglés.", "Irregular puro: 'ate'"],
+                        ["I did not know", "Yo no sabía", "I didn't knew", "El Pilar: El guardián del pasado (Did)", "Para negar en pasado usamos 'did not' (didn't). Este auxiliar asume todo el peso del tiempo.", "El error del doble pasado", "Poner el auxiliar en pasado Y el verbo principal en pasado es redundante.", "El verbo principal va normal"],
+                        ["She did not go", "Ella no fue", "She didn't went", "El Pilar: El auxiliar purifica al verbo", "Al usar 'didn't', el verbo rebelde 'went' es forzado a volver a su estado base 'go'.", "El error más doloroso de escuchar", "Es el error más común y el que más delata que sigues traduciendo mentalmente.", "El 'did' ya hizo el trabajo"],
+                        ["Did you sleep?", "¿Dormiste?", "You slept?", "El Pilar: El abridor de preguntas", "Para cuestionar en pasado, colocamos la palabra mágica 'Did' al inicio de todo.", "El error de depender del verbo", "En inglés las preguntas de acción no inician con el sujeto, inician con el auxiliar.", "Usa 'Did' para preguntar"],
+                        ["Did he call?", "¿Él llamó?", "Did he called?", "El Pilar: Pregunta con verbo limpio", "Nuevamente, el 'Did' al inicio ya hizo la pregunta en pasado. El verbo queda intacto.", "El error de la sobre-conjugación", "Aplicar '-ed' en una pregunta que ya tiene 'Did' ensucia la oración.", "El verbo 'call' va sin '-ed'"],
+                        ["Where did you go?", "¿A dónde fuiste?", "Where you went?", "El Pilar: Estructura interrogativa completa", "Fórmula: [Palabra W] + [Did] + [Sujeto] + [Verbo base].", "El error de saltarse el puente", "Las palabras como 'Where' necesitan el puente 'did' antes del sujeto.", "Falta el auxiliar 'did'"]
+                    ]
+                },
+                {
+                    world: 5, title: "5. El Futuro",
+                    introTitle: "Promesas y Planes (Will / Going To)",
+                    introDesc: "En inglés no conjugamos el futuro como en español (comeré, viajará). Usamos herramientas. 'Will' se usa para decisiones del momento o promesas (I will go). 'Going to' se usa cuando ya tienes un plan firme (I am going to go). Ambos son increíblemente lógicos y fijos en sus estructuras.",
+                    items: [
+                        ["I will help you", "Yo te ayudaré", "I will to help you", "El Pilar: La proyección de 'Will'", "'Will' proyecta al verbo hacia el futuro. Funciona de manera directa, sin palabras intermedias.", "El error de insertar el 'to'", "Es muy común en los latinos intentar poner un 'to' entre 'will' y el verbo de acción.", "Will jamás lleva 'to'"],
+                        ["She will come", "Ella vendrá", "She will comes", "El Pilar: Inmunidad de la tercera persona", "'Will' crea un escudo protector. Ni él ni el verbo siguiente aceptan la 'S' de He/She/It.", "El error de aplicar reglas de presente", "Mezclar las reglas de rutinas (S) con las reglas de proyecciones futuras.", "Ningún verbo lleva 'S' aquí"],
+                        ["We will not go", "Nosotros no iremos", "We not will go", "El Pilar: La negación del futuro", "Para decir que no en el futuro, colocamos 'not' inmediatamente después del 'will'.", "El error de posición", "Poner el 'no' al principio de la oración es una traducción literal defectuosa.", "'Not' va tras 'will'"],
+                        ["Will you stay?", "¿Te quedarás?", "You will stay?", "El Pilar: El salto hacia la pregunta", "La regla dorada se mantiene: el elemento auxiliar ('will') salta y lidera la frase para preguntar.", "El error de la declaración dudosa", "Asumir que el tono de voz convierte mágicamente la afirmación en interrogante.", "Will salta al frente"],
+                        ["I am going to eat", "Yo voy a comer", "I going to eat", "El Pilar: La tríada del plan firme", "Estructura obligatoria para planes: [Verbo To Be] + [going to] + [Verbo principal].", "El error de amputar la frase", "Olvidar el 'am' (verbo To Be) destruye por completo el sentido de la construcción.", "Falta el verbo to be (am)"],
+                        ["He is going to win", "Él va a ganar", "He go to win", "El Pilar: Singularización del plan", "Recuerda emparejar correctamente el pronombre con el verbo to be ('is' para He).", "El error de traducción pobre", "Traducir 'él va' literalmente como 'he go' omitiendo la estructura continua.", "Fórmula: is + going to"],
+                        ["They are going to travel", "Ellos van a viajar", "They is going to", "El Pilar: Pluralización del plan", "Para plurales ('They'), la pieza de encaje obligatoria es 'are'.", "El error de arrastrar el singular", "Mantener 'is' por costumbre cuando estamos hablando de varias personas.", "'They' requiere 'are'"],
+                        ["I am not going to call", "No voy a llamar", "I don't going to", "El Pilar: Negar el plan", "La negación ataca directamente a la base del verbo To Be. (am -> not -> going).", "El error del auxiliar intruso", "Usar 'don't' (de presente simple) en una estructura guiada por el verbo To Be.", "Usa 'am not'"],
+                        ["Are you going to sleep?", "¿Vas a dormir?", "You are going to sleep?", "El Pilar: Preguntar sobre intenciones", "Como esta estructura nace del verbo To Be, es este quien salta al inicio para hacer la pregunta.", "El error de inmovilidad", "Dejar el 'Are' atrapado después del sujeto.", "El 'Are' debe ir primero"],
+                        ["What will you do?", "¿Qué harás?", "What you will do?", "El Pilar: Palabra reina y su escudero", "Primero la palabra 'What', e inmediatamente después su escudero 'will'.", "El error de separar la dupla", "Poner el sujeto antes de la herramienta de tiempo en una pregunta.", "El 'will' va antes de 'you'"]
+                    ]
+                },
+                {
+                    world: 6, title: "6. Verbos Modales",
+                    introTitle: "La familia de los Modales",
+                    introDesc: "Los verbos modales (Can, Should, Must) son palabras con poderes especiales. Expresan habilidades, dar consejos u obligaciones. Son los 'rebeldes' de la gramática inglesa porque no siguen las reglas normales: no usan 'Do' o 'Does' para preguntar, nunca llevan 'to' después de ellos, y son inmunes a la 'S' de la tercera persona.",
+                    items: [
+                        ["I can swim", "Yo puedo nadar", "I can to swim", "El Pilar: Modales directos", "'Can' significa habilidad. En inglés, los modales van pegados directamente al verbo de acción.", "El error del infinitivo incrustado", "Traducir 'nadar' y pensar que requiere un 'to' antes.", "Los modales jamás llevan 'to'"],
+                        ["She can run fast", "Ella puede correr rápido", "She cans run", "El Pilar: Inmunidad absoluta", "Los modales son impenetrables. No aceptan la 'S' en He, She o It bajo ninguna circunstancia.", "El error de la 'S' fantasma", "Tratar de conjugar un modal como si fuera un verbo normal.", "Los modales no cambian de forma"],
+                        ["He should study", "Él debería estudiar", "He should studies", "El Pilar: El verbo satélite limpio", "'Should' da consejos. El verbo que le sigue se mantiene en su forma base y pura.", "El error de conjugar al satélite", "Tratar de aplicarle la 'S' de tercera persona al verbo principal es erróneo.", "El verbo principal va normal"],
+                        ["You must wait", "Tú debes esperar", "You must to wait", "El Pilar: Obligación pura", "'Must' denota una orden estricta. Su funcionamiento es idéntico a 'can' y 'should'.", "El error de contaminar la orden", "Romper la fluidez interponiendo un 'to' que no debe ir allí.", "Elimina el 'to'"],
+                        ["Can you help me?", "¿Puedes ayudarme?", "Do you can help me?", "El Pilar: Autosuficiencia interrogativa", "Los modales son tan fuertes que se invierten solos para hacer preguntas. No necesitan a 'Do'.", "El error de llamar a ayudantes", "Traer auxiliares externos ('do') cuando el modal puede hacer el trabajo.", "El modal salta al inicio"],
+                        ["I cannot see", "No puedo ver", "I don't can see", "El Pilar: Negación autónoma", "Para negar, el 'not' se fusiona o se coloca justo después del modal.", "El error de la negación tradicional", "Usar el comodín 'don't' es un error grave ante la presencia de un modal.", "Usa 'cannot' o 'can't'"],
+                        ["We should not go", "No deberíamos ir", "We not should go", "El Pilar: Estructura de consejo negativo", "El orden es inalterable: Sujeto + Modal + Not + Verbo.", "El error de posición", "Posicionar la negación antes del modal rompe el sentido de la frase.", "'Not' siempre va después"],
+                        ["May I come in?", "¿Puedo entrar?", "Can I to come in?", "El Pilar: Permiso formal", "'May' es la forma educada de pedir permiso. Funciona exactamente igual que 'can'.", "El error de las dos barreras", "Usar un modal incorrecto y encima añadirle el 'to'.", "Usa 'May' directo"],
+                        ["They might call", "Ellos podrían llamar", "They might to call", "El Pilar: Expresando probabilidad", "'Might' indica que algo tal vez suceda. Respeta las mismas reglas de pureza que los demás.", "El error sistemático del hispanohablante", "El cerebro hispano busca instintivamente el 'to'. Tienes que suprimirlo.", "Sin 'to' después de 'might'"],
+                        ["You have to pay", "Tienes que pagar", "You must to pay", "El Pilar: El falso modal (Have to)", "'Have to' significa obligación, pero a diferencia de los modales puros, este SÍ requiere el 'to'.", "El error de confundir reglas", "Usar 'must' y ponerle un 'to' es mezclar la regla de dos mundos distintos.", "'Must' va solo, 'Have' lleva 'to'"]
+                    ]
+                },
+                {
+                    world: 7, title: "7. Comparar el Mundo",
+                    introTitle: "Hacer Comparaciones",
+                    introDesc: "En inglés, la forma en que comparas dos cosas depende de cuán larga sea la palabra (el adjetivo). Para palabras cortas (de una sílaba), les pegamos un '-er' al final (tall -> taller). Para palabras largas, las dejamos intactas y les ponemos la palabra 'more' al principio (beautiful -> more beautiful). Nunca los mezcles.",
+                    items: [
+                        ["Bigger than that", "Más grande que eso", "More big than that", "El Pilar: Crecimiento de palabras cortas", "Si el adjetivo es de una sílaba (big), la regla es agregarle '-er' al final para compararlo.", "El error de la traducción fragmentada", "Traducir 'más' (more) y 'grande' (big) de forma separada es un error lógico.", "Usa la terminación '-er'"],
+                        ["She is older", "Ella es mayor", "She is more old", "El Pilar: Edad comparativa", "'Old' es corto. Al agregarle '-er' (older) englobas el significado de 'más vieja' o 'mayor'.", "El error de ignorar la longitud", "Ignorar que la palabra es corta y usar la regla de las palabras largas.", "Debe ser 'older'"],
+                        ["He is faster", "Él es más rápido", "He is more fast", "El Pilar: Velocidad relativa", "'Fast' -> 'Faster'. Es casi matemático y aplica para la gran mayoría de palabras monosílabas.", "El error del exceso de palabras", "Decir 'more fast' suena a que el hablante no conoce la sufijación básica del inglés.", "Agrega '-er' a 'fast'"],
+                        ["More beautiful than", "Más hermoso que", "Beautifuler than", "El Pilar: Regla de palabras largas", "Si la palabra tiene 3 o más sílabas, agregar '-er' la haría impronunciable. Ahí SÍ usamos 'more'.", "El error del trabalenguas", "Intentar forzar la regla de sufijos en palabras extensas.", "Palabras largas usan 'More'"],
+                        ["More expensive", "Más caro", "Expensiver", "El Pilar: Costos comparativos", "'Expensive' es una palabra muy larga. Por estética y fonética, se acompaña de 'more'.", "El error de inventar palabras", "La palabra 'expensiver' no existe en los diccionarios de la lengua inglesa.", "Usa 'More' al principio"],
+                        ["The biggest car", "El auto más grande", "The most big car", "El Pilar: Los superlativos cortos", "Para decir 'el más...' de todos, usamos 'The' y agregamos '-est' al final de la palabra corta.", "El error de combinar extremos", "Usar el superlativo de palabras largas con un adjetivo corto es incorrecto.", "Usa la terminación '-est'"],
+                        ["The most expensive", "Lo más caro", "The expensivest", "El Pilar: Los superlativos largos", "Para coronar a una palabra larga en la cima de todos, usamos 'The most'.", "El error del monstruo fonético", "Al igual que antes, agregar terminaciones raras a palabras de 3 sílabas rompe el ritmo.", "Usa 'The most'"],
+                        ["Better than me", "Mejor que yo", "Gooder than me", "El Pilar: Las excepciones doradas", "El comparativo de 'good' (bueno) no es 'gooder'. Cambia totalmente a 'Better' (mejor).", "El error de aplicar reglas ciegamente", "Las excepciones hay que aprenderlas de memoria. No existe 'gooder'.", "'Good' cambia a 'Better'"],
+                        ["The best day", "El mejor día", "The most good day", "El Pilar: La excepción superlativa", "El pico máximo de 'good' es 'The best' (el mejor).", "El error de usar fórmulas regulares", "No intentes construir el superlativo de palabras irregulares con piezas regulares.", "Es simplemente 'The best'"],
+                        ["Worse than before", "Peor que antes", "Badder than before", "El Pilar: La otra cara de la moneda", "'Bad' (malo) es la otra gran excepción. Su comparativo es 'Worse' (peor).", "El error de infantilizar el lenguaje", "Decir 'badder' es como si un niño pequeño estuviera aprendiendo a hablar.", "'Bad' cambia a 'Worse'"]
+                    ]
+                },
+                {
+                    world: 8, title: "8. Preposiciones (In/On/At)",
+                    introTitle: "La Pirámide de In, On, At",
+                    introDesc: "Este es el tema donde casi todos los que aprenden inglés dudan. Piensa en una pirámide invertida de tiempo y espacio. 'In' es la base ancha (para periodos largos de tiempo o espacios cerrados generales). 'On' es el medio (días específicos o superficies). 'At' es la punta afilada (horas precisas del reloj o puntos exactos en el mapa).",
+                    items: [
+                        ["In the morning", "En la mañana", "On the morning", "El Pilar: Concepto de amplitud (In)", "La mañana es un periodo largo y amplio de tiempo. Para periodos usamos 'In'.", "El error de confundir especificidad", "Usar 'On' para un momento del día tan amplio suena poco natural.", "Periodos amplios usan 'In'"],
+                        ["On Monday", "El lunes", "In Monday", "El Pilar: El nivel medio (Días = On)", "Regla de oro: Todos los días de la semana y fechas específicas en el calendario van casados con 'On'.", "El error de hipergeneralización", "Creer que 'In' sirve para cualquier segmento de tiempo.", "Días específicos siempre 'On'"],
+                        ["At night", "En la noche", "In the night", "El Pilar: La anomalía histórica", "Excepción del idioma: la noche ('night') se considera un punto de encuentro, por lo que usa 'At'.", "El error de buscar consistencia", "A veces el inglés rompe sus propias reglas de la mañana/tarde. La noche exige 'At'.", "'Night' siempre va con 'At'"],
+                        ["At six o'clock", "A las seis", "In six o'clock", "El Pilar: Puntería temporal (At)", "Las horas del reloj son el punto más afilado de la pirámide de tiempo. Usamos 'At'.", "El error de traducción difusa", "No diferenciar entre periodos amplios y la exactitud de un reloj.", "Horas exactas siempre 'At'"],
+                        ["In the box", "En la caja (dentro)", "On the box", "El Pilar: Contención tridimensional", "Cuando algo está rodeado por paredes o límites (una caja, una ciudad), se usa 'In' (dentro).", "El error visual", "Si usas 'On', estás diciendo que está reposando encima de la tapa exterior de la caja.", "'In' implica estar dentro"],
+                        ["On the table", "Sobre la mesa", "In the table", "El Pilar: Superficies (On)", "Para todo lo que descansa sobre una superficie plana sin estar contenido dentro de ella, usamos 'On'.", "El error de incrustar objetos", "Decir 'In the table' implica que cortaste la mesa y metiste el objeto adentro de la madera.", "'On' implica estar sobre"],
+                        ["At the door", "En la puerta", "In the door", "El Pilar: El punto en el mapa (At)", "'At' significa que estás en un punto geográfico de referencia, junto a la puerta.", "El error de fundirse con la materia", "Nadie puede estar literalmente 'dentro' (in) de la tabla de madera de la puerta.", "Puntos de referencia usan 'At'"],
+                        ["Under the bed", "Debajo de la cama", "Down the bed", "El Pilar: Posición inferior", "'Under' indica una posición cubierta por algo más, directamente en el eje vertical inferior.", "El error del adverbio de dirección", "'Down' significa hacia abajo (movimiento), no debajo (posición estática).", "Usa 'Under' para posición"],
+                        ["Next to you", "Al lado tuyo", "Beside of you", "El Pilar: La preposición compuesta", "'Next to' es una frase de dos palabras indisoluble que ubica algo en el plano horizontal contiguo.", "El error de mezclar palabras", "Añadir preposiciones sobrantes ('of') ensucia la frase y muestra confusión gramatical.", "Se usa 'Next to' intacto"],
+                        ["Between us", "Entre nosotros", "Among us", "El Pilar: El puente de dos partes", "'Between' se utiliza estrictamente cuando algo está situado en el medio de exactamente DOS cosas o personas.", "El error de grupos múltiples", "Confundir con 'Among', que se usa para describir estar rodeado por más de dos elementos.", "Para dos partes usa 'Between'"]
+                    ]
+                },
+                {
+                    world: 9, title: "9. Conectores Lógicos",
+                    introTitle: "El Pegamento del Idioma",
+                    introDesc: "Hablar con frases cortas de tres palabras suena robótico. Los conectores lógicos son el pegamento que usan los nativos para unir ideas, mostrar contrastes o explicar consecuencias. Dominar estas pequeñas piezas (but, because, so) es lo que te llevará del nivel intermedio a sonar realmente fluido e hilvanar historias completas.",
+                    items: [
+                        ["I like it but", "Me gusta pero", "I like it however", "El Pilar: El contraste directo", "'But' es el conector rey para introducir rápidamente una idea opuesta o contradictoria.", "El error de la formalidad exagerada", "Usar palabras académicas en frases demasiado simples y conversacionales.", "Para el día a día usa 'But'"],
+                        ["Red and blue", "Rojo y azul", "Red also blue", "El Pilar: Suma elemental", "'And' suma información de la misma naturaleza o jerarquía en una sola frase fluida.", "El error de listar torpemente", "Usar 'also' en lugar de 'and' interrumpe el flujo y suena como una lista desorganizada.", "Usa 'And' para conectar iguales"],
+                        ["Because I want to", "Porque quiero", "Why I want to", "El Pilar: Explicación de causa", "'Because' se usa exclusivamente en respuestas o afirmaciones para dar una razón.", "El error hispano de la pregunta", "En español 'por qué' (pregunta) y 'porque' (respuesta) suenan igual. En inglés son palabras totalmente distintas.", "'Why' pregunta, 'Because' responde"],
+                        ["Or maybe not", "O tal vez no", "And maybe not", "El Pilar: La disyuntiva", "'Or' presenta una elección clara entre diferentes posibilidades o alternativas en una idea.", "El error de anular la opción", "Conectar una duda excluyente usando un conector de suma ('And') genera frases incoherentes.", "Usa 'Or' para opciones"],
+                        ["So I went home", "Así que fui a casa", "Then I went home", "El Pilar: Consecuencia lógica", "'So' marca el resultado directo de una acción previa (Pasó A, así que pasó B).", "El error del conector de tiempo", "'Then' indica 'después' en tiempo, no indica 'por lo tanto' en términos lógicos o de consecuencia.", "'So' marca el resultado"],
+                        ["Although it rains", "Aunque llueva", "Even it rains", "El Pilar: El obstáculo superable", "'Although' introduce un evento adverso que no logra detener la acción principal de la frase.", "El error de la palabra mutilada", "Cortar la palabra a 'Even' cambia su sentido a 'Incluso'.", "La palabra completa es 'Although'"],
+                        ["However he said no", "Sin embargo dijo no", "But he said no", "El Pilar: El contraste elegante", "'However' es ideal para cambiar de rumbo después de un punto, elevando la formalidad.", "El error de iniciar oraciones con But", "Gramaticalmente, iniciar una nueva oración formal con 'But' es menos pulcro que usar 'However'.", "'However' es mejor tras un punto"],
+                        ["Therefore we win", "Por lo tanto ganamos", "So we win", "El Pilar: Conclusión académica", "'Therefore' es la versión lógica, formal y estructurada de 'So', usada en argumentaciones fuertes.", "El error de informalidad argumentativa", "No está mal decir 'So', pero 'Therefore' le da peso y seriedad absoluta a tu conclusión.", "'Therefore' eleva la calidad"],
+                        ["Also I like dogs", "También me gustan los perros", "Too I like dogs", "El Pilar: Adición de conceptos", "'Also' se coloca al principio de una idea o antes del verbo para añadir un nuevo punto de interés.", "El error de colocar 'too' al inicio", "La palabra 'too' significa 'también', pero su lugar natural es al final de la oración, no al inicio.", "'Too' va al final, 'Also' al inicio"],
+                        ["Before you go", "Antes de que te vayas", "Before that you go", "El Pilar: Precedencia temporal fluida", "'Before' puede conectar directamente a la persona y a la acción sin necesidad de puentes.", "El error de la traducción calcada", "Traducir literal 'antes de que' (before of that) genera frases pesadas y antinaturales.", "'Before' va directo al sujeto"]
+                    ]
+                },
+                {
+                    world: 10, title: "10. Fluidez y Estructuras",
+                    introTitle: "Pensamiento Nativo",
+                    introDesc: "En este último módulo aprenderás a pensar directamente en inglés. Hay estructuras que no tienen una traducción literal al español. Son fórmulas preestablecidas que los americanos usan instintivamente todos los días. Aprenderlas de memoria evitará que tu cerebro intente traducir palabra por palabra y fallar en el intento.",
+                    items: [
+                        ["If it rains", "Si llueve", "If rains", "El Pilar: Condicionales ancladas", "En estructuras lógicas de condición ('If'), el fenómeno meteorológico NUNCA pierde a su pronombre 'It'.", "El error de españolizar la condición", "Olvidar el sujeto es un vicio que persigue hasta niveles avanzados. 'Llueve' es una acción, requiere quién la haga.", "Falta el 'It'"],
+                        ["I will go if", "Iré si", "If I will go", "El Pilar: Orden flexible sin comas", "Puedes poner la consecuencia ('I will go') antes de la condición ('if'), fluyendo sin pausas.", "El error de duplicar estructuras", "Poner el 'If' en la parte del futuro arruina la causa-efecto.", "La consecuencia va antes de 'if'"],
+                        ["The man who called", "El hombre que llamó", "The man that called", "El Pilar: Relativos humanos", "Para conectar ideas refiriéndose a una persona específica, es más preciso y natural usar 'who' (quien).", "El error de cosificar personas", "Usar 'that' para personas no es estrictamente incorrecto, pero 'who' es la marca de un hablante avanzado.", "Es mejor usar 'who' para personas"],
+                        ["I think that", "Yo creo que", "I think what", "El Pilar: El puente de ideas", "El conector 'that' sirve como eslabón para unir tu pensamiento con el resto de la frase.", "El error de confundir 'qué' con 'que'", "Utilizar la palabra de pregunta 'what' en lugar del conector 'that'.", "'What' pregunta, 'That' conecta"],
+                        ["She said that", "Ella dijo que", "She said me that", "El Pilar: Reportando diálogos limpios", "El verbo 'say' (decir) no requiere que pongas el receptor de la información inmediatamente después.", "El error de inyectar el pronombre", "Si vas a poner a quién se lo dijo, debes usar 'told' (She told me), no 'said'.", "'Said' no lleva pronombre directo"],
+                        ["I want you to go", "Quiero que vayas", "I want that you go", "El Pilar: El deseo sobre otros", "Fórmula americana de hierro: Want + Persona + To + Verbo base. No se traduce palabra por palabra.", "El error que todo latino comete", "Traducir calcado 'Yo quiero que tú vayas' crea una monstruosidad gramatical ininteligible para un nativo.", "Fórmula: Want + You + To + Verbo"],
+                        ["Tell me what to do", "Dime qué hacer", "Tell me what I do", "El Pilar: Interrogativas con infinitivos", "Tras palabras como 'what' o 'where' a mitad de frase, colocamos el verbo en infinitivo (to + verbo).", "El error de reiniciar la frase", "Construir una nueva mini-oración rompe la fluidez y elegancia que da el usar 'to'.", "Usa 'to' después del 'what'"],
+                        ["I know how to play", "Sé cómo jugar", "I know play", "El Pilar: La destreza adquirida", "En inglés no basta decir 'sé jugar'. Debes decir literalmente 'sé CÓMO jugar' obligatoriamente.", "El error de omitir el método", "Para los nativos, saber hacer una habilidad física o mental requiere siempre la partícula 'how to'.", "Es obligatorio poner 'how to'"],
+                        ["As soon as possible", "Tan pronto como sea posible", "So soon as possible", "El Pilar: La cuna de las comparaciones", "La estructura 'As... As...' delimita comparaciones de equidad o marca límites fijos.", "El error de alterar los pilares", "Usar conectores como 'So' rompe el balance de la frase idiomática.", "La frase fija es 'As... As'"],
+                        ["I have been there", "He estado allí", "I am been there", "El Pilar: La experiencia de vida", "El Presente Perfecto se forma con el auxiliar 'Have' (Haber) seguido del verbo en participio.", "El error de usar To Be como Haber", "Confundir las raíces del verbo y usar el verbo de existencia para intentar armar una experiencia pasada.", "Se usa 'have' como auxiliar"]
+                    ]
+                }
+            ];
+
+            worlds.forEach(w => {
+                db.push({
+                    id: classId++,
+                    world: w.world,
+                    isIntro: true,
+                    en: w.introTitle,
+                    es: "Comprende la base de este módulo antes de empezar.",
+                    pillarTitle: "Regla de Oro",
+                    pillarDesc: w.introDesc,
+                    errorTitle: "Cuidado con la traducción literal",
+                    errorDesc: "El objetivo principal de LinguoFlow es que pienses en la estructura del inglés, no que copies el orden del español.",
+                    whyMistake: "Ignorar la regla de oro del módulo"
+                });
+
+                w.items.forEach(item => {
+                    db.push({
+                        id: classId++, world: w.world, isIntro: false,
+                        en: item[0], es: item[1], mistake: item[2],
+                        pillarTitle: item[3], pillarDesc: item[4],
+                        errorTitle: item[5], errorDesc: item[6], whyMistake: item[7]
+                    });
+                });
+            });
+
+            return db;
+        }
+
+        const syllabusDB = generateDeepDatabase();
+        const worldNames = ["Verbo To Be", "Presente Simple", "Presente Continuo", "Pasado Simple", "El Futuro", "Verbos Modales", "Comparaciones", "Preposiciones", "Conectores Lógicos", "Estructuras Nativas"];
+
+        // ==========================================
+        // 3. GENERADOR DE EJERCICIOS + SISTEMA DE REPASO
+        // ==========================================
+        function compactTheoryTopic(label, maxWords = 5) {
+            const clean = String(label || '').replace(/[.,;:!?]+$/g, '').trim();
+            if (!clean) return '';
+            const words = clean.split(/\s+/).filter(Boolean);
+            return words.slice(0, Math.max(1, maxWords)).join(' ');
+        }
+
+        function buildModuleTheoryContext(worldId) {
+            const moduleLessons = syllabusDB.filter((lesson) => !lesson.isIntro && lesson.world === worldId);
+            const focusSet = new Set();
+            const mistakeSet = new Set();
+
+            moduleLessons.forEach((lesson) => {
+                const cleanTitle = String(lesson.pillarTitle || '')
+                    .replace(/^El Pilar:\s*/i, '')
+                    .trim();
+                const compactTitle = compactTheoryTopic(cleanTitle, 5);
+                if (compactTitle) focusSet.add(compactTitle);
+
+                const cleanMistake = String(lesson.whyMistake || lesson.mistake || '')
+                    .replace(/^Falta\s+/i, 'Falta ')
+                    .trim();
+                if (cleanMistake) mistakeSet.add(cleanMistake);
+            });
+
+            return {
+                lessonCount: moduleLessons.length,
+                focusItems: Array.from(focusSet).slice(0, 3),
+                mistakeItems: Array.from(mistakeSet).slice(0, 3)
+            };
+        }
+
+        function shuffle(array) {
+            let currentIndex = array.length, randomIndex;
+            while (currentIndex !== 0) {
+                randomIndex = Math.floor(Math.random() * currentIndex);
+                currentIndex--;
+                [array[currentIndex], array[randomIndex]] = [array[randomIndex], array[currentIndex]];
+            }
+            return array;
+        }
+
+        function normalizeSentenceToken(token) {
+            return String(token || '').toLowerCase().replace(/[^a-z0-9']/gi, '').trim();
+        }
+
+        function escapeHTML(value) {
+            return String(value || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function tokenizeSentenceForDiff(sentence) {
+            return String(sentence || '')
+                .trim()
+                .split(/\s+/)
+                .filter(Boolean)
+                .map((raw, index) => {
+                    const cleaned = String(raw).replace(/^[^a-z0-9']+|[^a-z0-9']+$/gi, '');
+                    return {
+                        index,
+                        raw: String(raw),
+                        cleaned: cleaned || String(raw),
+                        normalized: normalizeSentenceToken(raw)
+                    };
+                });
+        }
+
+        function buildTokenFrequency(tokens) {
+            return tokens.reduce((acc, token) => {
+                if (!token.normalized) return acc;
+                acc[token.normalized] = (acc[token.normalized] || 0) + 1;
+                return acc;
+            }, {});
+        }
+
+        function getPreferredTokenLabel(tokens, normalizedToken) {
+            const tokenObj = tokens.find((token) => token.normalized === normalizedToken);
+            if (!tokenObj) return normalizedToken;
+            return tokenObj.cleaned || tokenObj.raw || normalizedToken;
+        }
+
+        function collectTokenDiff(sourceCounts, targetCounts, sourceTokens) {
+            const diffs = [];
+            Object.keys(sourceCounts).forEach((token) => {
+                const amount = sourceCounts[token] - (targetCounts[token] || 0);
+                if (amount > 0) {
+                    diffs.push({
+                        token,
+                        count: amount,
+                        label: getPreferredTokenLabel(sourceTokens, token)
+                    });
+                }
+            });
+            return diffs;
+        }
+
+        function formatTokenDiffList(items) {
+            return items.map((item) => `"${item.label}"${item.count > 1 ? ` x${item.count}` : ''}`);
+        }
+
+        function joinNaturalList(items) {
+            const safeItems = items.filter(Boolean);
+            if (!safeItems.length) return '';
+            if (safeItems.length === 1) return safeItems[0];
+            if (safeItems.length === 2) return `${safeItems[0]} y ${safeItems[1]}`;
+            return `${safeItems.slice(0, -1).join(', ')} y ${safeItems[safeItems.length - 1]}`;
+        }
+
+        function buildDynamicErrorAnalysis(userText, correctText, lessonRef) {
+            const safeUserText = String(userText || '').trim() || '(sin respuesta)';
+            const safeCorrectText = String(correctText || '').trim() || '';
+            const userTokens = tokenizeSentenceForDiff(safeUserText);
+            const correctTokens = tokenizeSentenceForDiff(safeCorrectText);
+            const userCounts = buildTokenFrequency(userTokens);
+            const correctCounts = buildTokenFrequency(correctTokens);
+
+            const missingTokens = collectTokenDiff(correctCounts, userCounts, correctTokens);
+            const extraTokens = collectTokenDiff(userCounts, correctCounts, userTokens);
+            const userNormalized = userTokens.map((token) => token.normalized).filter(Boolean);
+            const correctNormalized = correctTokens.map((token) => token.normalized).filter(Boolean);
+
+            const replacements = [];
+            const maxIndex = Math.min(userTokens.length, correctTokens.length);
+            for (let i = 0; i < maxIndex; i++) {
+                const userToken = userTokens[i];
+                const correctToken = correctTokens[i];
+                if (!userToken.normalized || !correctToken.normalized) continue;
+                if (userToken.normalized !== correctToken.normalized) {
+                    replacements.push({
+                        position: i + 1,
+                        current: userToken.cleaned || userToken.raw,
+                        expected: correctToken.cleaned || correctToken.raw
+                    });
+                }
+            }
+
+            const hasOrderIssue = !missingTokens.length
+                && !extraTokens.length
+                && userNormalized.join(' ') !== correctNormalized.join(' ');
+
+            const diagnosis = [];
+            const correctionSteps = [];
+            const tags = [];
+
+            if (missingTokens.length) {
+                tags.push('Faltan palabras clave');
+                diagnosis.push(`Te faltó ${joinNaturalList(formatTokenDiffList(missingTokens))}.`);
+                correctionSteps.push(`Añade ${joinNaturalList(formatTokenDiffList(missingTokens))} en la estructura.`);
+            }
+
+            if (extraTokens.length) {
+                tags.push('Hay palabras de más');
+                diagnosis.push(`Agregaste de más ${joinNaturalList(formatTokenDiffList(extraTokens))}.`);
+                correctionSteps.push(`Elimina ${joinNaturalList(formatTokenDiffList(extraTokens))}; esa parte no va en esta regla.`);
+            }
+
+            if (replacements.length && !missingTokens.length && !extraTokens.length) {
+                const replacementPreview = replacements
+                    .slice(0, 2)
+                    .map((item) => `en posición ${item.position}: "${item.current}" -> "${item.expected}"`);
+                tags.push('Palabra incorrecta');
+                diagnosis.push(`Cambiaste palabra clave (${joinNaturalList(replacementPreview)}).`);
+                correctionSteps.push(`Sustituye esas palabras por la forma exacta que exige la regla.`);
+            }
+
+            if (hasOrderIssue) {
+                tags.push('Orden incorrecto');
+                diagnosis.push('Las palabras correctas están, pero el orden no respeta la estructura inglesa.');
+                correctionSteps.push(`Usa el orden exacto: "${safeCorrectText}".`);
+            }
+
+            if (!diagnosis.length) {
+                tags.push('Estructura incompleta');
+                diagnosis.push('La respuesta no coincide con la estructura esperada para esta lección.');
+            }
+
+            if (!correctionSteps.length) {
+                correctionSteps.push(`Repite la estructura correcta tal cual: "${safeCorrectText}".`);
+            }
+            correctionSteps.push('Repítela en voz alta 2 veces para fijar el patrón.');
+
+            const subjectPronouns = ['i', 'you', 'he', 'she', 'it', 'we', 'they'];
+            const expectedSubject = correctNormalized[0] || '';
+            const givenSubject = userNormalized[0] || '';
+            const subjectMismatch = subjectPronouns.includes(expectedSubject) && expectedSubject !== givenSubject;
+            if (subjectMismatch) {
+                tags.unshift('Sujeto incorrecto');
+                diagnosis.unshift(`El sujeto no coincide: debía empezar con "${getPreferredTokenLabel(correctTokens, expectedSubject)}".`);
+                correctionSteps.unshift(`Empieza con el sujeto correcto: "${getPreferredTokenLabel(correctTokens, expectedSubject)}".`);
+            }
+
+            return {
+                safeUserText,
+                safeCorrectText,
+                title: String((lessonRef || {}).errorTitle || 'Análisis del error').trim(),
+                description: String((lessonRef || {}).errorDesc || 'Revisemos la estructura exacta para corregir tu intento.').trim(),
+                detail: String((lessonRef || {}).whyMistake || '').trim(),
+                tags: tags.slice(0, 3),
+                diagnosis,
+                correctionSteps
+            };
+        }
+
+        function getUniqueOptions(seedOptions, minCount, fallbackPool = []) {
+            const normalized = new Set();
+            const options = [];
+
+            [...seedOptions, ...fallbackPool].forEach((value) => {
+                const cleanValue = String(value || '').trim();
+                const normalizedValue = normalizeSentenceToken(cleanValue) || cleanValue.toLowerCase();
+                if (!cleanValue || normalized.has(normalizedValue)) return;
+                normalized.add(normalizedValue);
+                options.push(cleanValue);
+            });
+
+            return options.slice(0, minCount);
+        }
+
+        function getLessonCandidates(excludedLessonId, mapper) {
+            return syllabusDB
+                .filter((item) => !item.isIntro && item.id !== excludedLessonId)
+                .map((item) => mapper(item))
+                .filter((item) => Boolean(item));
+        }
+
+        function buildSentenceOptions(lesson) {
+            const englishCandidates = shuffle(getLessonCandidates(lesson.id, (item) => item.en));
+            const options = getUniqueOptions([lesson.en, lesson.mistake, ...englishCandidates], 3, englishCandidates);
+            return shuffle(options.slice(0, 3));
+        }
+
+        function buildTranslationOptions(lesson) {
+            const translationCandidates = shuffle(getLessonCandidates(lesson.id, (item) => item.es));
+            const options = getUniqueOptions([lesson.es, ...translationCandidates], 3, translationCandidates);
+            return shuffle(options.slice(0, 3));
+        }
+
+        // POOL MEJORADO DE DISTRACTORES
+        function buildFillOptions(lesson, targetWord) {
+            const distractorPools = {
+                'am': ['is', 'are', 'was', 'be'], 'is': ['am', 'are', 'was', 'be'], 'are': ['am', 'is', 'were', 'be'],
+                'do': ['does', 'did', 'doing', 'done'], 'does': ['do', 'did', 'doing', 'done'], 'did': ['do', 'does', 'done', 'doing'],
+                'will': ['would', 'can', 'going', 'to'], 'can': ['could', 'will', 'must', 'do'],
+                'in': ['on', 'at', 'under', 'to'], 'on': ['in', 'at', 'above', 'to'], 'at': ['in', 'on', 'by', 'to'],
+                'he': ['she', 'it', 'they', 'we'], 'she': ['he', 'it', 'they', 'we'], 'it': ['he', 'she', 'they', 'this'],
+                'they': ['we', 'he', 'she', 'it'], 'we': ['they', 'you', 'he', 'she'],
+                'not': ['no', 'never', 'dont', 'none']
+            };
+
+            const targetLower = (targetWord || '').toLowerCase();
+            let customPool = distractorPools[targetLower];
+            let fillerPool = [];
+
+            if (customPool) {
+                fillerPool = [...customPool];
+            } else {
+                const lessonTokens = lesson.en.split(/\s+/).map((token) => token.trim()).filter(Boolean);
+                const mistakeTokens = lesson.mistake.split(/\s+/).map((token) => token.trim()).filter(Boolean);
+                fillerPool = [...lessonTokens, ...mistakeTokens, 'is', 'are', 'do', 'does', 'did', 'to', 'not'];
+            }
+
+            const options = getUniqueOptions([targetWord, ...fillerPool], 4, fillerPool);
+            return shuffle(options.slice(0, 4));
+        }
+
+        function buildIntroExerciseForModule(lesson) {
+            const moduleLessons = syllabusDB.filter((item) => !item.isIntro && item.world === lesson.world);
+            const anchorLesson = moduleLessons[0] || lesson;
+            const moduleTheory = buildModuleTheoryContext(lesson.world);
+            const focusLabel = moduleTheory.focusItems.slice(0, 2).join(' + ');
+            const focusText = focusLabel || 'la estructura principal del módulo';
+            const wrongPool = shuffle(moduleLessons.map((item) => item.mistake).filter(Boolean));
+            const options = getUniqueOptions([anchorLesson.en, ...wrongPool], 3, wrongPool);
+
+            return {
+                type: 'mc',
+                isReview: false,
+                question: `Pregunta de comprensión:<br><span class="text-blue-400">En este módulo, ¿cuál opción respeta ${focusText}?</span>`,
+                options: shuffle(options.slice(0, 3)),
+                correct: anchorLesson.en,
+                lessonRef: lesson,
+                audioText: anchorLesson.es,
+                audioLang: 'es-DO'
+            };
+        }
+
+        function createExercisesForLesson(lesson) {
+            if (lesson.isIntro) {
+                return [buildIntroExerciseForModule(lesson)];
+            }
+
+            const exercises = [];
+            const words = lesson.en.split(/\s+/).map((word) => word.trim()).filter(Boolean);
+
+            exercises.push({
+                type: 'mc', isReview: false,
+                question: `Elige la traducción de:<br><span class="text-blue-400">"${lesson.es}"</span>`,
+                options: buildSentenceOptions(lesson), correct: lesson.en, lessonRef: lesson, audioText: lesson.es, audioLang: 'es-DO'
+            });
+
+            exercises.push({
+                type: 'mc', isReview: false,
+                question: `¿Qué significa en español?<br><span class="text-blue-400">"${lesson.en}"</span>`,
+                options: buildTranslationOptions(lesson), correct: lesson.es, lessonRef: lesson, audioText: lesson.en, audioLang: 'en-US'
+            });
+
+            if (words.length > 1) {
+                const targetWord = words[1] || words[0];
+                const blanked = lesson.en.replace(targetWord, '___');
+                exercises.push({
+                    type: 'fill', isReview: false,
+                    question: `Completa el vacío:<br><span class="text-blue-400">${blanked}</span>`,
+                    options: buildFillOptions(lesson, targetWord), correct: targetWord, lessonRef: lesson, audioText: blanked.replace(/_{2,}/g, '').replace(/\s+/g, ' ').trim() || lesson.en, audioLang: 'en-US'
+                });
+            }
+
+            if (words.length > 1) {
+                exercises.push({
+                    type: 'order', isReview: false,
+                    question: `Ordena las palabras para decir:<br><span class="text-blue-400">"${lesson.es}"</span><br><span class="text-sm text-gray-500 font-normal animate-pulse block mt-2">(Haz clic en las palabras para ordenarlas)</span>`,
+                    scrambled: shuffle([...words]), correct: lesson.en, lessonRef: lesson, audioText: lesson.es, audioLang: 'es-DO'
+                });
+            }
+
+            if (lesson.id > 3) {
+                const pastLessons = syllabusDB.filter((item) => !item.isIntro && item.id < lesson.id);
+                const randomPastLesson = pastLessons.length ? pastLessons[Math.floor(Math.random() * pastLessons.length)] : null;
+
+                if (randomPastLesson) {
+                    const reviewOptions = buildSentenceOptions(randomPastLesson);
+                    if (!reviewOptions.includes(randomPastLesson.en)) reviewOptions[0] = randomPastLesson.en;
+                    exercises.push({
+                        type: 'mc', isReview: true,
+                        question: `REPASO RÁPIDO:<br>¿Recuerdas cómo decir <span class="text-purple-400">"${randomPastLesson.es}"</span>?`,
+                        options: shuffle(reviewOptions), correct: randomPastLesson.en, lessonRef: randomPastLesson, audioText: randomPastLesson.es, audioLang: 'es-DO'
+                    });
+                }
+            }
+
+            return shuffle(exercises).slice(0, 5);
+        }
+
+        function ensureVocabularyEntry(lessonId) {
+            const safeLessonId = Math.max(0, parseInt(lessonId) || 0);
+            if (!safeLessonId) {
+                return;
+            }
+
+            const vocabKey = getVocabStorageKey(safeLessonId);
+            const currentRecord = normalizeVocabRecord(vocabProgress[vocabKey] || {});
+            vocabProgress[vocabKey] = {
+                ...currentRecord,
+                lastSeenLesson: Math.max(currentRecord.lastSeenLesson, safeLessonId),
+                lastInteraction: Date.now()
+            };
+        }
+
+        function updateLessonAndVocabularyStats(lessonId, isCorrect) {
+            const safeLessonId = Math.max(0, parseInt(lessonId) || 0);
+            if (!safeLessonId) {
+                return;
+            }
+
+            const lessonKey = String(safeLessonId);
+            const lessonMetric = normalizeLessonMetric(lessonStats[lessonKey] || {});
+            const lessonAttempts = lessonMetric.attempts + 1;
+            const lessonCorrect = lessonMetric.correct + (isCorrect ? 1 : 0);
+            const lessonWrong = lessonMetric.wrong + (isCorrect ? 0 : 1);
+            const lessonMastery = lessonAttempts ? clampNumber(Math.round((lessonCorrect / lessonAttempts) * 100), 0, 100) : 0;
+
+            lessonStats[lessonKey] = {
+                attempts: lessonAttempts,
+                correct: lessonCorrect,
+                wrong: lessonWrong,
+                mastery: lessonMastery,
+                lastAttemptAt: Date.now()
+            };
+
+            const vocabKey = getVocabStorageKey(safeLessonId);
+            const vocabRecord = normalizeVocabRecord(vocabProgress[vocabKey] || {});
+            const attempts = vocabRecord.attempts + 1;
+            const correct = vocabRecord.correct + (isCorrect ? 1 : 0);
+            const wrong = vocabRecord.wrong + (isCorrect ? 0 : 1);
+            const consecutiveWrong = isCorrect ? 0 : vocabRecord.consecutiveWrong + 1;
+            const ratioMastery = attempts ? Math.round((correct / attempts) * 100) : 0;
+            let mastery = ratioMastery;
+
+            if (isCorrect) {
+                mastery = clampNumber(Math.max(vocabRecord.mastery, ratioMastery + 6), 0, 100);
+            } else {
+                const loweredMastery = vocabRecord.mastery > 0 ? vocabRecord.mastery - 14 : ratioMastery;
+                const keepMasteredOnFirstMistake = vocabRecord.mastery >= VOCAB_MASTERED_THRESHOLD && consecutiveWrong < 2;
+                mastery = clampNumber(
+                    keepMasteredOnFirstMistake
+                        ? Math.max(VOCAB_MASTERED_THRESHOLD, loweredMastery)
+                        : loweredMastery,
+                    5,
+                    100
+                );
+            }
+
+            const enoughEvidence = attempts >= VOCAB_MIN_ATTEMPTS_TO_MASTER;
+            const masteredByData = enoughEvidence
+                && mastery >= VOCAB_MASTERED_THRESHOLD
+                && wrong <= Math.max(1, Math.floor(attempts * 0.2));
+            const needsReviewByMistakes = consecutiveWrong >= 2;
+            const keepExistingReview = vocabRecord.needsReview && !masteredByData;
+            const needsReview = needsReviewByMistakes || keepExistingReview;
+
+            vocabProgress[vocabKey] = {
+                ...vocabRecord,
+                attempts,
+                correct,
+                wrong,
+                consecutiveWrong,
+                mastery,
+                needsReview,
+                lastSeenLesson: Math.max(vocabRecord.lastSeenLesson, safeLessonId),
+                lastInteraction: Date.now()
+            };
+        }
+
+        // ==========================================
+        // 4. CONTROLADOR DE CLASE Y UI
+        // ==========================================
+        let currentLessonObj = null;
+        let classExercises = [];
+        let currentExerciseIndex = 0;
+        let classMistakes = 0;
+        let lessonHadMistake = false;
+        let orderSelectedWords = [];
+        let orderAvailableWords = [];
+        let selectedMultipleAnswer = '';
+        let selectedMultipleButton = null;
+        let requestedLevelFromUrl = 0;
+        let requestedAutoStart = false;
+
+        function setLevelsHeaderContext(title, subtitle) {
+            const headerTitle = document.getElementById('levels-view-title');
+            const headerSubtitle = document.getElementById('levels-view-subtitle');
+            if (headerTitle) headerTitle.textContent = title || 'Mapa de Niveles';
+            if (headerSubtitle) headerSubtitle.textContent = subtitle || 'Ruta completa de clases y progreso.';
+        }
+
+        function resolveNavigationRequest() {
+            const params = new URLSearchParams(window.location.search);
+            const requestedLevel = Math.max(0, parseInt(params.get('level')) || 0);
+            const requestedWorld = Math.max(0, parseInt(params.get('world')) || 0);
+            const autoStart = params.get('autostart') === '1';
+            const maxLessonId = syllabusDB.length ? syllabusDB[syllabusDB.length - 1].id : 1;
+            const maxAllowedLevel = Math.min(unlockedLevel, maxLessonId);
+
+            if (requestedLevel > 0) {
+                requestedLevelFromUrl = Math.min(maxAllowedLevel, requestedLevel);
+            } else if (requestedWorld > 0) {
+                const worldStartLevel = ((requestedWorld - 1) * 11) + 1;
+                requestedLevelFromUrl = Math.min(maxAllowedLevel, Math.max(1, worldStartLevel));
+            } else {
+                requestedLevelFromUrl = Math.min(maxAllowedLevel, Math.max(1, maxAllowedLevel));
+            }
+
+            requestedAutoStart = autoStart && requestedLevelFromUrl > 0 && requestedLevelFromUrl <= unlockedLevel;
+        }
+
+        function focusRequestedLevel() {
+            if (!requestedLevelFromUrl) {
+                return;
+            }
+
+            const targetLevel = requestedLevelFromUrl;
+            requestedLevelFromUrl = 0;
+            const levelCard = document.getElementById(`level-card-${targetLevel}`);
+            if (!levelCard) {
+                return;
+            }
+
+            setTimeout(() => {
+                levelCard.classList.add('ring-2', 'ring-blue-400/70', 'ring-offset-2', 'ring-offset-[#0B1120]');
+                levelCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+                if (requestedAutoStart) {
+                    requestedAutoStart = false;
+                    startClass(targetLevel);
+                }
+
+                setTimeout(() => {
+                    levelCard.classList.remove('ring-2', 'ring-blue-400/70', 'ring-offset-2', 'ring-offset-[#0B1120]');
+                }, 2200);
+            }, 120);
+        }
+
+        // OPTIMIZACIÓN DE RENDERIZADO DEL MAPA
+        function renderMap() {
+            setLevelsHeaderContext('Mapa de Niveles', 'Ruta completa de clases y progreso.');
+            const timeline = document.getElementById('timeline');
+            let mapHTML = '<div class="timeline-line" id="timeline-line"></div>';
+
+            let completedPercent = Math.min(100, Math.max(0, (unlockedLevel - 1) / 110 * 100));
+            document.getElementById('global-progress').innerText = `${Math.floor(completedPercent)}%`;
+            document.documentElement.style.setProperty('--progress-height', `${completedPercent}%`);
+
+            let currentWorld = 0;
+
+            syllabusDB.forEach(lesson => {
+                if (lesson.world !== currentWorld) {
+                    currentWorld = lesson.world;
+                    mapHTML += `
+                        <div class="world-divider animate-fade">
+                            <span>Módulo ${currentWorld}: ${worldNames[currentWorld - 1]}</span>
+                        </div>
+                    `;
+                }
+
+                const isUnlocked = lesson.id <= unlockedLevel;
+                const isCompleted = lesson.id < unlockedLevel;
+                
+                let nodeClass = `node ${isCompleted ? 'completed' : isUnlocked ? 'unlocked' : ''}`;
+                let nodeIcon = isCompleted ? `<i class="ph-fill ph-check text-2xl"></i>` : 
+                               isUnlocked ? (lesson.isIntro ? `<i class="ph-fill ph-lightbulb text-2xl text-yellow-500"></i>` : `<i class="ph-fill ph-play text-2xl text-blue-500"></i>`) : 
+                               `<i class="ph ph-lock-key text-xl"></i>`;
+
+                let cardClass = `level-card ${isUnlocked ? 'unlocked' : ''}`;
+                let label = lesson.isIntro ? 'Teoría' : 'Clase ' + lesson.id;
+                let titleHtml = `<span class="text-xs font-bold ${isUnlocked ? (lesson.isIntro ? 'text-yellow-400 border-yellow-700' : 'text-blue-400 border-gray-700') : 'text-gray-500 border-gray-700'} uppercase tracking-widest bg-[#0B1120] px-3 py-1 rounded-full border">${label}</span>`;
+                
+                mapHTML += `
+                    <div class="level-row animate-fade">
+                        <div id="level-card-${lesson.id}" class="${cardClass}" ${isUnlocked ? `onclick="startClass(${lesson.id})"` : ''}>
+                            <div class="flex justify-between items-start mb-3">
+                                ${titleHtml}
+                            </div>
+                            <h3 class="text-xl font-bold mb-2 ${isUnlocked ? 'text-white' : 'text-gray-500'}">${lesson.en}</h3>
+                            <p class="text-sm text-gray-400">${lesson.isIntro ? lesson.es : `Aprende la estructura: "${lesson.es}"`}</p>
+                        </div>
+                        <div class="${nodeClass}">${nodeIcon}</div>
+                    </div>
+                `;
+            });
+
+            timeline.innerHTML = mapHTML;
+            focusRequestedLevel();
+        }
+
+        function startClass(id) {
+            if (globalLives <= 0) { document.getElementById('no-lives-modal').style.display = 'flex'; return; }
+
+            const nextLesson = syllabusDB.find(l => l.id === id);
+            if (!nextLesson || nextLesson.id > unlockedLevel) {
+                return;
+            }
+
+            registerStudyDay(2);
+            currentLessonObj = nextLesson;
+            ensureVocabularyEntry(currentLessonObj.id);
+            classExercises = createExercisesForLesson(currentLessonObj);
+            currentExerciseIndex = -1;
+            classMistakes = 0;
+            lessonHadMistake = false;
+            setLevelsHeaderContext(`Clase ${currentLessonObj.id}`, `Practica activa: ${currentLessonObj.en}`);
+
+            renderLivesUI();
+            document.getElementById('map-view').style.display = 'none';
+            document.getElementById('class-view').style.display = 'block';
+            
+            if(window.innerWidth <= 768 && isSidebarOpen) toggleBtn.click();
+            window.scrollTo(0,0);
+            renderClassStep();
+        }
+
+        function renderClassStep() {
+            const container = document.getElementById('class-content');
+            const classView = document.getElementById('class-view');
+            const total = classExercises.length;
+            const isTheoryStep = currentExerciseIndex === -1;
+
+            container.classList.toggle('exercise-active', !isTheoryStep);
+            classView.classList.toggle('theory-mode', isTheoryStep);
+            classView.classList.toggle('exercise-mode', !isTheoryStep);
+            
+            let progressValue = '0%';
+            if (currentExerciseIndex >= 0 && total > 0) progressValue = `${((currentExerciseIndex + 1) / (total + 1)) * 100}%`;
+            document.getElementById('exercise-progress').style.width = progressValue;
+
+            if (currentExerciseIndex === -1) {
+                if (currentLessonObj.isIntro) {
+                    const moduleTheory = buildModuleTheoryContext(currentLessonObj.world);
+                    const moduleLabel = worldNames[currentLessonObj.world - 1] || `Módulo ${currentLessonObj.world}`;
+                    const focusItemsHtml = moduleTheory.focusItems.length
+                        ? moduleTheory.focusItems.map((item) => `
+                            <p class="text-gray-100 font-semibold leading-snug">${escapeHTML(item)}</p>
+                        `).join('')
+                        : '<p class="text-gray-300 font-medium">Estructura principal del módulo</p>';
+                    const mistakeItemsHtml = moduleTheory.mistakeItems.length
+                        ? moduleTheory.mistakeItems.map((item) => `
+                            <li class="text-gray-200 flex items-start gap-3">
+                                <i class="ph-fill ph-warning-circle text-amber-400 mt-1 shrink-0"></i>
+                                <span>${escapeHTML(item)}</span>
+                            </li>
+                        `).join('')
+                        : '<li class="text-gray-300">Corregiremos traducción literal y orden incorrecto de palabras.</li>';
+
+                    container.innerHTML = `
+                        <div class="animate-fade max-w-3xl mx-auto w-full space-y-6 text-left">
+                            <div class="flex items-center gap-3 mb-4 px-2">
+                                <i class="ph-fill ph-book-open-text text-4xl text-blue-400"></i>
+                                <h2 class="text-3xl font-black text-white tracking-tight">Introducción al Módulo ${currentLessonObj.world}</h2>
+                            </div>
+                            <div class="bg-[#151E2E] border border-[#2A3B52] rounded-2xl p-8 shadow-lg relative overflow-hidden">
+                                <div class="absolute -right-6 -top-6 w-32 h-32 bg-blue-500/10 rounded-full blur-3xl"></div>
+                                <h3 class="text-2xl font-bold text-white mb-6 relative z-10">${currentLessonObj.en}</h3>
+                                <p class="text-gray-300 text-lg leading-relaxed relative z-10">${currentLessonObj.pillarDesc}</p>
+                                <p class="text-sm text-blue-300 mt-4 font-semibold relative z-10">${moduleLabel} • ${moduleTheory.lessonCount} clases prácticas</p>
+                            </div>
+
+                            <div class="bg-[#151E2E] border border-[#2A3B52] rounded-2xl p-6 shadow-lg">
+                                <h4 class="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                                    <i class="ph-fill ph-target text-emerald-400"></i> Qué se trabajará en este módulo
+                                </h4>
+                                <p class="text-gray-400 text-sm mb-4">Puntos clave (resumen corto):</p>
+                                <div class="space-y-3">${focusItemsHtml}</div>
+                            </div>
+
+                            <div class="bg-[#151E2E] border border-[#2A3B52] rounded-2xl p-6 shadow-lg">
+                                <h4 class="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                                    <i class="ph-fill ph-warning-octagon text-amber-400"></i> Errores que vamos a corregir
+                                </h4>
+                                <ul class="space-y-3">${mistakeItemsHtml}</ul>
+                            </div>
+                            <button onclick="nextExercise()" class="w-full mt-6 bg-blue-600 hover:bg-blue-500 text-white font-bold py-5 rounded-2xl text-xl transition-all shadow-[0_4px_0_rgb(37,99,235)] hover:translate-y-[2px] active:shadow-none">
+                                Entendido, realizar prueba rápida
+                            </button>
+                        </div>
+                    `;
+                } else {
+                    let breakdownHTML = generatePieceByPiece(currentLessonObj.en);
+                    let extraCardHTML = "";
+                    
+                    if (breakdownHTML !== "") {
+                        extraCardHTML = `
+                            <div class="bg-[#151E2E] border border-[#2A3B52] rounded-2xl p-6 shadow-lg relative overflow-hidden mt-6">
+                                <div class="flex items-center gap-4 mb-6">
+                                    <div class="w-12 h-12 bg-[#3B82F6]/20 rounded-xl flex items-center justify-center shrink-0 border border-blue-500/30">
+                                        <i class="ph-fill ph-magnifying-glass-plus text-2xl text-blue-400"></i>
+                                    </div>
+                                    <h3 class="text-xl md:text-2xl font-bold text-white">Análisis pieza por pieza</h3>
+                                </div>
+                                <div class="space-y-3">${breakdownHTML}</div>
+                            </div>
+                        `;
+                    }
+
+                    container.innerHTML = `
+                        <div class="animate-fade max-w-3xl mx-auto w-full space-y-6 text-left">
+                            <div class="flex items-center gap-3 mb-4 px-2">
+                                <i class="ph-fill ph-lightbulb text-3xl text-[#E879F9]"></i>
+                                <h2 class="text-3xl font-black text-[#E879F9] tracking-tight">Reglas de esta clase</h2>
+                            </div>
+
+                            <div class="bg-[#151E2E] border border-[#2A3B52] rounded-2xl p-6 shadow-lg">
+                                <div class="flex items-center gap-4 mb-4">
+                                    <div class="w-12 h-12 bg-[#2D2A4A] rounded-xl flex items-center justify-center shrink-0">
+                                        <i class="ph-fill ph-chalkboard-teacher text-2xl text-[#A78BFA]"></i>
+                                    </div>
+                                    <h3 class="text-xl md:text-2xl font-bold text-white">${currentLessonObj.pillarTitle}</h3>
+                                </div>
+                                <p class="text-gray-300 text-lg leading-relaxed">${currentLessonObj.pillarDesc}</p>
+                            </div>
+
+                            <div class="bg-[#151E2E] border border-[#2A3B52] rounded-2xl p-6 shadow-lg relative overflow-hidden">
+                                <div class="flex items-center gap-4 mb-6">
+                                    <div class="w-12 h-12 bg-[#1E293B] rounded-xl flex items-center justify-center shrink-0">
+                                        <i class="ph-fill ph-warning-octagon text-2xl text-[#60A5FA]"></i>
+                                    </div>
+                                    <h3 class="text-xl md:text-2xl font-bold text-white">${currentLessonObj.errorTitle}</h3>
+                                </div>
+                                <p class="text-gray-300 text-lg leading-relaxed mb-6">${currentLessonObj.errorDesc}</p>
+                                
+                                <div class="space-y-3">
+                                    <div class="bg-[#2A1B24] border border-[#4C1D2A] rounded-xl p-4 flex items-center gap-3">
+                                        <i class="ph-fill ph-minus-circle text-red-500 text-xl shrink-0"></i>
+                                        <div>
+                                            <span class="font-bold text-gray-200">Error común:</span>
+                                            <span class="text-red-200 ml-1 font-mono">"${currentLessonObj.mistake}"</span>
+                                            <span class="text-gray-500 text-sm ml-2">(${currentLessonObj.whyMistake})</span>
+                                        </div>
+                                    </div>
+                                    <div class="bg-[#142C24] border border-[#1B4332] rounded-xl p-4 flex items-center gap-3">
+                                        <i class="ph-fill ph-check-circle text-green-500 text-xl shrink-0"></i>
+                                        <div>
+                                            <span class="font-bold text-gray-200">Correcto:</span>
+                                            <span class="text-green-200 ml-1 font-mono">"${currentLessonObj.en}"</span>
+                                            <span class="text-gray-500 text-sm ml-2">(${currentLessonObj.es})</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            ${extraCardHTML}
+
+                            <p class="text-center text-orange-400/80 text-sm font-medium flex items-center justify-center gap-2 mt-8 italic">
+                                <i class="ph-fill ph-warning-circle"></i> Ten cuidado. Cada fallo te quitará 1 vida inmediatamente.
+                            </p>
+
+                            <button onclick="nextExercise()" class="w-full mt-6 bg-blue-600 hover:bg-blue-500 text-white font-bold py-5 rounded-2xl text-xl transition-all shadow-[0_4px_0_rgb(37,99,235)] hover:translate-y-[2px] active:shadow-none">
+                                Comprendido, ¡vamos a entrenar!
+                            </button>
+                        </div>
+                    `;
+                }
+            } else if (currentExerciseIndex < total) {
+                const ex = classExercises[currentExerciseIndex];
+                let headerColor = ex.isReview ? "text-purple-400 bg-purple-500/10 border-purple-500/20" : "text-blue-400 bg-blue-500/10 border-blue-500/20";
+                
+                if (ex.type === 'mc' || ex.type === 'fill') {
+                    selectedMultipleAnswer = '';
+                    selectedMultipleButton = null;
+                    let optionsHtml = '';
+                    let displayOptions = shuffle([...ex.options]);
+                    displayOptions.forEach((opt, idx) => {
+                        const safeOpt = String(opt)
+                            .replace(/\\/g, '\\\\')
+                            .replace(/'/g, "\\'");
+                        optionsHtml += `
+                            <button onclick="checkAnswerMultiple('${safeOpt}', this)" class="exercise-option exercise-option-enter w-full text-left p-6 rounded-2xl text-xl font-medium flex items-center justify-between shadow-sm group" style="animation-delay: ${idx * 80}ms;">
+                                <span class="text-white">${opt}</span>
+                                <div class="answer-dot w-6 h-6 rounded-full border-2 border-[#2A3B52] transition-colors"></div>
+                            </button>
+                        `;
+                    });
+
+                    let icon = ex.type === 'mc' ? 'ph-cursor-click' : 'ph-keyboard';
+                    container.innerHTML = `
+                        <div class="animate-fade exercise-card w-full max-w-2xl mx-auto p-8 md:p-10 rounded-[2rem] border border-[#2A3B52] shadow-2xl">
+                            <div class="exercise-pill inline-flex items-center gap-2 font-bold uppercase text-xs tracking-widest px-4 py-2 rounded-full border mb-8 ${headerColor}">
+                                <i class="ph-fill ${icon} text-lg"></i> ${ex.isReview ? 'Repaso de memoria' : 'Selecciona la respuesta'}
+                            </div>
+                            <h2 class="exercise-question text-3xl md:text-4xl font-bold mb-10 text-white leading-tight">${ex.question}</h2>
+                            <button type="button" onclick="playCurrentExerciseAudio()" class="exercise-audio-btn mb-6 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-500/10 border border-blue-500/30 text-blue-300 font-bold text-sm hover:bg-blue-500/20 transition-colors">
+                                <i class="ph-fill ph-speaker-high text-lg"></i> Escuchar oracion completa
+                            </button>
+                            <div class="space-y-4" id="options-container">${optionsHtml}</div>
+                            <button id="mc-next-btn" type="button" onclick="submitSelectedAnswer(this)" class="exercise-cta w-full mt-8 bg-blue-600 text-white font-bold py-5 rounded-2xl text-xl opacity-50 pointer-events-none transition-all shadow-[0_4px_0_rgb(37,99,235)]">
+                                Siguiente
+                            </button>
+                        </div>
+                    `;
+                } else if (ex.type === 'order') {
+                    orderSelectedWords = [];
+                    orderAvailableWords = [...ex.scrambled];
+                    
+                    container.innerHTML = `
+                        <div class="animate-fade exercise-card w-full max-w-2xl mx-auto p-8 md:p-10 rounded-[2rem] border border-[#2A3B52] shadow-2xl">
+                            <div class="exercise-pill inline-flex items-center gap-2 font-bold uppercase text-xs tracking-widest px-4 py-2 rounded-full border mb-8 ${headerColor}">
+                                <i class="ph-fill ph-squares-four text-lg"></i> Forma la oración exacta
+                            </div>
+                            <h2 class="exercise-question text-3xl md:text-4xl font-bold mb-10 text-white leading-tight">${ex.question}</h2>
+                            <div class="flex flex-wrap gap-3 mb-6">
+                                <button type="button" onclick="playCurrentExerciseAudio()" class="exercise-audio-btn inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-500/10 border border-blue-500/30 text-blue-300 font-bold text-sm hover:bg-blue-500/20 transition-colors">
+                                    <i class="ph-fill ph-speaker-high text-lg"></i> Escuchar oracion completa
+                                </button>
+                                <button type="button" onclick="playCurrentOrderPhrase()" class="exercise-secondary-btn inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#0B1120] border border-[#2A3B52] text-gray-300 font-bold text-sm hover:text-white hover:border-blue-500/40 transition-colors">
+                                    <i class="ph-fill ph-waveform text-lg"></i> Escuchar mi oracion
+                                </button>
+                            </div>
+                            
+                            <div id="order-dropzone" class="dropzone-area mb-8 min-h-[100px]"></div>
+                            <div id="order-words" class="flex flex-wrap gap-3 mb-10 justify-center min-h-[60px]"></div>
+                            
+                            <button id="order-check-btn" onclick="checkAnswerOrder(this)" class="exercise-cta w-full bg-blue-600 text-white font-bold py-5 rounded-2xl text-xl opacity-50 pointer-events-none transition-all shadow-[0_4px_0_rgb(37,99,235)]">
+                                Comprobar
+                            </button>
+                        </div>
+                    `;
+                    renderOrderUI();
+                }
+            } else {
+                showSuccess();
+            }
+        }
+
+        // ==========================================
+        // 5. LÓGICA DE ORDENAR PALABRAS
+        // ==========================================
+        function renderOrderUI() {
+            const dropzone = document.getElementById('order-dropzone');
+            const wordsContainer = document.getElementById('order-words');
+            const checkBtn = document.getElementById('order-check-btn');
+
+            dropzone.innerHTML = orderSelectedWords.map((word, idx) => 
+                `<div onclick="removeOrderWord(${idx})" class="word-chip bg-gradient-to-b from-blue-500 to-blue-600 border-blue-400 shadow-[0_4px_0_rgb(29,78,216)] hover:shadow-[0_6px_0_rgb(29,78,216)]">${word}</div>`
+            ).join('');
+
+            wordsContainer.innerHTML = orderAvailableWords.map((word, idx) => {
+                if(word === null) return `<div class="w-[80px] h-[50px] bg-white/5 rounded-2xl border border-dashed border-white/10"></div>`; 
+                return `<div onclick="selectOrderWord(${idx})" class="word-chip bg-[#1E293B] border-[#334155] shadow-[0_4px_0_rgb(30,41,59)] hover:border-blue-400">${word}</div>`;
+            }).join('');
+
+            if (orderAvailableWords.every(w => w === null)) {
+                checkBtn.classList.remove('opacity-50', 'pointer-events-none');
+                checkBtn.classList.add('hover:bg-blue-500', 'active:translate-y-[4px]', 'active:shadow-none');
+            } else {
+                checkBtn.classList.add('opacity-50', 'pointer-events-none');
+                checkBtn.className = "exercise-cta w-full bg-blue-600 text-white font-bold py-5 rounded-2xl text-xl opacity-50 pointer-events-none transition-all shadow-[0_4px_0_rgb(37,99,235)]";
+            }
+        }
+
+        function selectOrderWord(index) {
+            orderSelectedWords.push(orderAvailableWords[index]);
+            orderAvailableWords[index] = null;
+            renderOrderUI();
+        }
+
+        function removeOrderWord(selectedIndex) {
+            const wordToReturn = orderSelectedWords[selectedIndex];
+            const emptyIndex = orderAvailableWords.indexOf(null);
+            if(emptyIndex !== -1) orderAvailableWords[emptyIndex] = wordToReturn;
+            orderSelectedWords.splice(selectedIndex, 1);
+            renderOrderUI();
+        }
+
+        // ==========================================
+        // 6. VALIDACIÓN Y FEEDBACK INTELIGENTE
+        // ==========================================
+        function checkAnswerMultiple(userText, buttonElement) {
+            if (!buttonElement) return;
+            const ex = classExercises[currentExerciseIndex];
+            if (!ex) return;
+
+            selectedMultipleAnswer = userText;
+            selectedMultipleButton = buttonElement;
+
+            document.querySelectorAll('.exercise-option').forEach((btn) => {
+                btn.classList.remove('is-selected');
+                btn.style.borderColor = '';
+                btn.style.backgroundColor = '';
+                const dot = btn.querySelector('.answer-dot');
+                if (dot) {
+                    dot.style.borderColor = '';
+                    dot.style.backgroundColor = '';
+                }
+            });
+
+            buttonElement.style.borderColor = 'rgba(59, 130, 246, 0.95)';
+            buttonElement.style.backgroundColor = 'rgba(59, 130, 246, 0.12)';
+            buttonElement.classList.add('is-selected');
+            const selectedDot = buttonElement.querySelector('.answer-dot');
+            if (selectedDot) {
+                selectedDot.style.borderColor = 'rgba(96, 165, 250, 1)';
+                selectedDot.style.backgroundColor = 'rgba(96, 165, 250, 1)';
+            }
+
+            playExerciseAudio(userText);
+
+            const nextBtn = document.getElementById('mc-next-btn');
+            if (nextBtn) {
+                nextBtn.classList.remove('opacity-50', 'pointer-events-none');
+                nextBtn.classList.add('hover:bg-blue-500', 'active:translate-y-[4px]', 'active:shadow-none');
+            }
+        }
+
+        function submitSelectedAnswer(buttonElement) {
+            const ex = classExercises[currentExerciseIndex];
+            if (!ex || !selectedMultipleButton || !selectedMultipleAnswer) return;
+
+            document.querySelectorAll('.exercise-option').forEach((btn) => { btn.style.pointerEvents = 'none'; });
+            if (buttonElement) {
+                buttonElement.classList.add('opacity-50', 'pointer-events-none');
+            }
+
+            const isCorrect = selectedMultipleAnswer === ex.correct;
+            handleValidationResult(isCorrect, selectedMultipleAnswer, ex.correct, ex, selectedMultipleButton);
+        }
+
+        function checkAnswerOrder(buttonElement) {
+            const ex = classExercises[currentExerciseIndex];
+            const userPhrase = orderSelectedWords.join(' ');
+            const isCorrect = userPhrase === ex.correct;
+            buttonElement.style.pointerEvents = 'none';
+            handleValidationResult(isCorrect, userPhrase, ex.correct, ex, document.getElementById('order-dropzone'));
+        }
+
+        function registerQuizAttempt(isCorrect, lessonRef) {
+            quizStats = normalizeQuizStats(quizStats);
+            quizStats.answered += 1;
+            if (isCorrect) {
+                quizStats.correct = Math.min(quizStats.answered, quizStats.correct + 1);
+                quizStats.currentStreak = Math.max(0, quizStats.currentStreak) + 1;
+                quizStats.bestStreak = Math.max(quizStats.bestStreak, quizStats.currentStreak);
+            } else {
+                quizStats.currentStreak = 0;
+            }
+
+            const lessonId = Math.max(0, parseInt((lessonRef || {}).id) || 0);
+            if (lessonId) {
+                updateLessonAndVocabularyStats(lessonId, isCorrect);
+            }
+
+            saveCurrentProgress();
+        }
+
+        function handleValidationResult(isCorrect, userText, correctText, ex, visualElement) {
+            registerQuizAttempt(isCorrect, ex.lessonRef);
+            if (isCorrect) {
+                playFeedbackSound('correct');
+                classMistakes = 0;
+                visualElement.classList.add('correct', '!border-green-500');
+                if(ex.type !== 'order') {
+                    visualElement.innerHTML = `<span class="text-green-400 font-bold">${userText}</span> <i class="ph-fill ph-check-circle text-3xl text-green-500 drop-shadow-[0_0_8px_rgba(16,185,129,0.5)]"></i>`;
+                }
+                setTimeout(() => nextExercise(), 1000);
+            } else {
+                playFeedbackSound('incorrect');
+                classMistakes++;
+                lessonHadMistake = true;
+                loseLife();
+                visualElement.classList.add('incorrect', 'shake-animation', '!border-red-500');
+                
+                if(ex.type !== 'order') {
+                    visualElement.innerHTML = `<span class="text-red-400 font-medium line-through">${userText}</span> <i class="ph-fill ph-x-circle text-3xl text-red-500 drop-shadow-[0_0_8px_rgba(239,68,68,0.5)]"></i>`;
+                }
+
+                if (globalLives <= 0) {
+                    setTimeout(() => { document.getElementById('no-lives-modal').style.display = 'flex'; }, 800);
+                    return;
+                }
+
+                if (classMistakes === 2) {
+                    setTimeout(() => {
+                        const feedbackContent = document.getElementById('feedback-content');
+                        const analysis = buildDynamicErrorAnalysis(userText, correctText, ex.lessonRef);
+                        
+                        let introMessage = ex.isReview 
+                            ? "Parece que has olvidado esta regla de una clase anterior. Repasemos:"
+                            : "Tu cerebro hispanohablante te está jugando una mala pasada. Mira por qué:";
+
+                        const tagsHtml = analysis.tags.length
+                            ? `<div class="flex flex-wrap gap-2 mb-4">${analysis.tags.map((tag) => `
+                                <span class="px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/30 text-blue-300 text-xs font-bold uppercase tracking-wider">${escapeHTML(tag)}</span>
+                            `).join('')}</div>`
+                            : '';
+
+                        const diagnosisHtml = analysis.diagnosis.map((item) => `
+                            <li class="flex items-start gap-3 text-gray-200">
+                                <i class="ph-fill ph-magnifying-glass text-cyan-300 mt-1 shrink-0"></i>
+                                <span>${escapeHTML(item)}</span>
+                            </li>
+                        `).join('');
+
+                        const correctionStepsHtml = analysis.correctionSteps.map((step, index) => `
+                            <li class="flex items-start gap-3 text-gray-100">
+                                <span class="w-6 h-6 rounded-full bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 text-xs font-black flex items-center justify-center shrink-0 mt-0.5">${index + 1}</span>
+                                <span>${escapeHTML(step)}</span>
+                            </li>
+                        `).join('');
+
+                        const detailHtml = analysis.detail
+                            ? `<p class="text-gray-400 text-sm italic mt-3">(Detalle: ${escapeHTML(analysis.detail)})</p>`
+                            : '';
+
+                        feedbackContent.innerHTML = `
+                            <p class="text-gray-300 text-lg leading-relaxed">${introMessage}</p>
+                            
+                            <div class="bg-[#0B1120] p-6 rounded-2xl border border-[#2A3B52] my-6">
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div class="bg-red-500/10 p-4 rounded-xl border border-red-500/20">
+                                        <span class="text-red-400 text-xs font-bold uppercase tracking-widest block mb-2"><i class="ph-fill ph-x"></i> Lo que elegiste</span>
+                                        <p class="text-red-300 font-mono text-lg line-through decoration-red-500">${escapeHTML(analysis.safeUserText)}</p>
+                                    </div>
+                                    <div class="bg-green-500/10 p-4 rounded-xl border border-green-500/20">
+                                        <span class="text-green-400 text-xs font-bold uppercase tracking-widest block mb-2"><i class="ph-fill ph-check"></i> La forma correcta</span>
+                                        <p class="text-green-300 font-mono font-bold text-lg">${escapeHTML(analysis.safeCorrectText)}</p>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="bg-blue-500/10 p-6 rounded-2xl border border-blue-500/20 relative mt-8">
+                                <div class="absolute -top-3 left-6 bg-[#151E2E] px-2 text-blue-400 text-xs font-bold uppercase tracking-widest border border-blue-500/20 rounded-full">Análisis del error</div>
+                                <div class="mt-2">
+                                    ${tagsHtml}
+                                    <p class="text-gray-200 leading-relaxed text-lg">
+                                        <strong class="text-white">${escapeHTML(analysis.title)}:</strong> ${escapeHTML(analysis.description)}
+                                    </p>
+                                    ${detailHtml}
+                                    <ul class="mt-5 space-y-3">${diagnosisHtml}</ul>
+                                </div>
+                            </div>
+
+                            <div class="bg-emerald-500/10 p-6 rounded-2xl border border-emerald-500/20 relative mt-6">
+                                <div class="absolute -top-3 left-6 bg-[#151E2E] px-2 text-emerald-300 text-xs font-bold uppercase tracking-widest border border-emerald-500/20 rounded-full">Cómo corregirlo ahora</div>
+                                <ol class="mt-4 space-y-3">${correctionStepsHtml}</ol>
+                                <div class="mt-5 bg-[#06211A] border border-emerald-500/25 rounded-xl p-4">
+                                    <p class="text-emerald-300 text-xs font-bold uppercase tracking-widest mb-2">Frase objetivo</p>
+                                    <p class="text-emerald-100 font-mono text-lg">${escapeHTML(analysis.safeCorrectText)}</p>
+                                </div>
+                            </div>
+                        `;
+                        document.getElementById('feedback-modal').style.display = 'flex';
+                        resetVisualElement(visualElement, userText, ex.type);
+                        classMistakes = 0; 
+                    }, 800);
+                } else {
+                    setTimeout(() => resetVisualElement(visualElement, userText, ex.type), 1200);
+                }
+            }
+        }
+
+        function resetVisualElement(visualElement, text, type) {
+            visualElement.classList.remove('incorrect', 'shake-animation', '!border-red-500', 'correct', '!border-green-500', 'is-selected');
+            if(type !== 'order') {
+                visualElement.style.borderColor = '';
+                visualElement.style.backgroundColor = '';
+                visualElement.innerHTML = `<span class="text-white">${text}</span> <div class="answer-dot w-6 h-6 rounded-full border-2 border-[#2A3B52] transition-colors"></div>`;
+                selectedMultipleAnswer = '';
+                selectedMultipleButton = null;
+                const nextBtn = document.getElementById('mc-next-btn');
+                if (nextBtn) {
+                    nextBtn.classList.add('opacity-50', 'pointer-events-none');
+                    nextBtn.classList.remove('hover:bg-blue-500', 'active:translate-y-[4px]', 'active:shadow-none');
+                }
+                document.querySelectorAll('.exercise-option').forEach(btn => btn.style.pointerEvents = 'auto');
+            } else {
+                document.getElementById('order-check-btn').style.pointerEvents = 'auto';
+            }
+        }
+
+        function nextExercise() {
+            currentExerciseIndex++;
+            window.scrollTo(0,0);
+            renderClassStep();
+        }
+
+        function showSuccess() {
+            let shouldSave = false;
+            achievementStats = normalizeAchievementStats(achievementStats);
+            achievementsUnlocked = normalizeAchievementsUnlocked(achievementsUnlocked);
+            const previousUnlockState = JSON.stringify(achievementsUnlocked);
+
+            if (currentLessonObj && !currentLessonObj.isIntro) {
+                if (!lessonHadMistake) {
+                    achievementStats.perfectLessons += 1;
+                    achievementStats.currentPerfectStreak += 1;
+                    achievementStats.bestPerfectStreak = Math.max(
+                        achievementStats.bestPerfectStreak,
+                        achievementStats.currentPerfectStreak
+                    );
+                } else {
+                    achievementStats.currentPerfectStreak = 0;
+                }
+                shouldSave = true;
+            }
+
+            if (currentLessonObj.id >= unlockedLevel) {
+                unlockedLevel = Math.min(111, currentLessonObj.id + 1);
+                shouldSave = true;
+            }
+
+            if (currentLessonObj && currentLessonObj.id) {
+                ensureVocabularyEntry(currentLessonObj.id);
+            }
+
+            if (unlockedLevel >= 2) achievementsUnlocked.firstSteps = true;
+            if (achievementStats.bestPerfectStreak >= 10 || achievementStats.perfectLessons >= 10) achievementsUnlocked.brightMind = true;
+            if (achievementStats.studyStreak >= 7) achievementsUnlocked.fireStreak = true;
+            if (unlockedLevel >= 111) achievementsUnlocked.globalMaster = true;
+
+            const unlockStateChanged = JSON.stringify(achievementsUnlocked) !== previousUnlockState;
+            if (shouldSave || unlockStateChanged) saveCurrentProgress();
+            
+            document.getElementById('success-modal').style.display = 'flex';
+        }
+
+        function closeFeedbackModal() { document.getElementById('feedback-modal').style.display = 'none'; }
+        function closeNoLivesModal() { document.getElementById('no-lives-modal').style.display = 'none'; exitClass(); }
+        
+        function playMapEntranceAnimation() {
+            document.querySelectorAll('.map-entrance').forEach((element) => {
+                element.classList.remove('animate-slide-up');
+                void element.offsetWidth;
+                element.classList.add('animate-slide-up');
+            });
+        }
+        
+        function exitClass() {
+            const classView = document.getElementById('class-view');
+            classView.style.display = 'none';
+            classView.classList.remove('theory-mode', 'exercise-mode');
+            document.getElementById('class-content').classList.remove('exercise-active');
+            document.getElementById('map-view').style.display = 'block';
+            setLevelsHeaderContext('Mapa de Niveles', 'Ruta completa de clases y progreso.');
+            renderMap();
+            playMapEntranceAnimation();
+            window.scrollTo(0,0);
+        }
+        
+        function finishClass() { document.getElementById('success-modal').style.display = 'none'; exitClass(); }
+
+        window.onload = async () => {
+            activeUser = await getActiveUser();
+            const activeUserEmail = activeUser ? normalizeEmail(activeUser.email) : '';
+            canPersistProgress = Boolean(activeUser && activeUser.id && SUPABASE_BACKEND && SUPABASE_BACKEND.isReady());
+            progressStorageEmail = canPersistProgress ? activeUserEmail : '';
+
+            const initialProgress = await getInitialProgress(progressStorageEmail, canPersistProgress);
+            globalLives = initialProgress.lives;
+            nextLifeTime = initialProgress.nextLifeTime;
+            unlockedLevel = initialProgress.unlockedLevel;
+            quizStats = normalizeQuizStats(initialProgress.quizStats);
+            achievementStats = normalizeAchievementStats(initialProgress.achievementStats);
+            achievementsUnlocked = normalizeAchievementsUnlocked(initialProgress.achievementsUnlocked);
+            lessonStats = normalizeLessonStats(initialProgress.lessonStats);
+            vocabProgress = normalizeVocabProgress(initialProgress.vocabProgress);
+            activityLog = normalizeActivityLog(initialProgress.activityLog);
+            studyByDay = normalizeStudyByDay(initialProgress.studyByDay);
+            studyTimeMs = Math.max(0, parseInt(initialProgress.studyTimeMs) || 0);
+            studyGoalPreference = (typeof initialProgress.studyGoal === 'string' && initialProgress.studyGoal.trim())
+                ? initialProgress.studyGoal.trim()
+                : '25 min';
+            targetLevelPreference = (typeof initialProgress.targetLevel === 'string' && initialProgress.targetLevel.trim())
+                ? initialProgress.targetLevel.trim()
+                : 'b1';
+            profileSettingsPreference = (initialProgress.profileSettings && typeof initialProgress.profileSettings === 'object')
+                ? initialProgress.profileSettings
+                : profileSettingsPreference;
+
+            const sidebarUserSettings = document.getElementById('sidebar-user-settings');
+            if (sidebarUserSettings) {
+                sidebarUserSettings.classList.toggle('hidden', !activeUser);
+            }
+
+            resolveNavigationRequest();
+            registerStudyDay(1);
+            updateLivesLogic();
+            renderMap();
+            playMapEntranceAnimation();
+            const mapView = document.getElementById('map-view');
+            if (mapView) {
+                requestAnimationFrame(() => {
+                    mapView.classList.remove('opacity-0', 'translate-y-2');
+                });
+            }
+        };
+
+    </script>
+</body>
+</html>
+
